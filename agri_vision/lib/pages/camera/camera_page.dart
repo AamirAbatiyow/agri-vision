@@ -166,9 +166,9 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
     final safeCustomLabels = customLabelsSafe;
     final treatmentList = <String>[];
     final rawTreatments = safeCustomLabels['treatment'];
-    if (rawTreatments is List)
+    if (rawTreatments is List) {
       treatmentList.addAll(rawTreatments.map((e) => e.toString()));
-    else if (rawTreatments is String)
+    } else if (rawTreatments is String)
       treatmentList.add(rawTreatments);
 
     return Scaffold(

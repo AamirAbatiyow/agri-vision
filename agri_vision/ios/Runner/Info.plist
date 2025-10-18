@@ -45,16 +45,5 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Allow AgriVision to use the camera to capture plant photos.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Allow AgriVision to select plant photos from your library.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Allow AgriVision to save photos to your library.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>AgriVision needs your location to provide accurate local weather data for your farm.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>AgriVision needs your location to provide accurate local weather data for your farm.</string>
-
 </dict>
 </plist>

@@ -120,7 +120,7 @@ class _SignupPageState extends State<SignupPage> {
 
               // Farm type
               DropdownButtonFormField<String>(
-                value: farmType.isEmpty ? null : farmType,
+                initialValue: farmType.isEmpty ? null : farmType,
                 items: const [
                   DropdownMenuItem(value: 'Greenhouse', child: Text('Greenhouse')),
                   DropdownMenuItem(value: 'Crop Farm', child: Text('Crop Farm')),

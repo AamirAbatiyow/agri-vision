@@ -82,7 +82,7 @@ class _TabInfo {
 
 class _KeepAlive extends StatefulWidget {
   final Widget child;
-  const _KeepAlive({required this.child, super.key});
+  const _KeepAlive({required this.child});
   @override
   State<_KeepAlive> createState() => _KeepAliveState();
 }
