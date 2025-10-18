@@ -105,6 +105,16 @@ class _DashboardPageState extends State<DashboardPage> {
               });
             },
           ),
+          // Dark mode toggle
+          IconButton(
+            icon: Icon(
+              UserPrefs.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            ),
+            tooltip: 'Toggle dark mode',
+            onPressed: () {
+              UserPrefs.toggleDarkMode();
+            },
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -205,7 +215,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           subtitle: weather == null
                               ? 'Fetching weather data'
                               : !weather.hasSoilData
-                              ? 'Estimated (real sensors needed)'
+                              ? 'Estimated'
                               : weather.soilMoisture < 35
                               ? 'Dry • Auto-watering recommended'
                               : weather.soilMoisture > 75
