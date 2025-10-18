@@ -17,7 +17,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final Stream<SensorSnapshot> _sensor$;
   late final Stream<WeatherNow> _weather$;
-  late List<WeatherDay> _forecast;
+  List<WeatherDay> _forecast = [];
 
   // rolling history for sparklines
   final List<double> tempHistory = [];
@@ -32,7 +32,17 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _sensor$ = SensorService.I.start();
     _weather$ = WeatherService.I.start();
-    _forecast = WeatherService.I.forecast();
+    _loadForecast();
+  }
+
+  Future<void> _loadForecast() async {
+    // Wait a moment for the initial forecast fetch to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {
+        _forecast = WeatherService.I.forecast();
+      });
+    }
   }
 
   @override
@@ -88,7 +98,9 @@ class _DashboardPageState extends State<DashboardPage> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 sliver: SliverGrid.count(
-                  crossAxisCount: MediaQuery.of(context).size.width > 800 ? 3 : 2,
+                  crossAxisCount: MediaQuery.of(context).size.width > 800
+                      ? 3
+                      : 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   children: [
@@ -116,8 +128,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       subtitle: s.soilMoisture < 35
                           ? 'Dry • Auto-watering recommended'
                           : s.soilMoisture > 75
-                              ? 'Wet • Watering paused'
-                              : 'Healthy range',
+                          ? 'Wet • Watering paused'
+                          : 'Healthy range',
                       icon: FontAwesomeIcons.droplet,
                       color: scheme.tertiaryContainer,
                       sparkline: moistHistory,
@@ -135,7 +147,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     MetricCard(
                       title: 'Wind',
                       value: '${s.windMph.toStringAsFixed(1)} mph',
-                      subtitle: s.windMph > 15 ? 'Breezy • Secure covers' : 'Calm',
+                      subtitle: s.windMph > 15
+                          ? 'Breezy • Secure covers'
+                          : 'Calm',
                       icon: FontAwesomeIcons.wind,
                       color: scheme.surfaceContainerHigh,
                       sparkline: windHistory,
@@ -161,7 +175,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Today’s Trends', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'Today’s Trends',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       TrendCard(
                         title: 'Temperature (last 60s)',
@@ -234,16 +254,28 @@ class _WeatherNowCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 14,
                   runSpacing: -4,
                   children: [
-                    _ChipText(icon: FontAwesomeIcons.temperatureHalf, text: 'Temp $temp'),
-                    _ChipText(icon: FontAwesomeIcons.fireFlameCurved, text: 'Feels $feels'),
+                    _ChipText(
+                      icon: FontAwesomeIcons.temperatureHalf,
+                      text: 'Temp $temp',
+                    ),
+                    _ChipText(
+                      icon: FontAwesomeIcons.fireFlameCurved,
+                      text: 'Feels $feels',
+                    ),
                     _ChipText(icon: FontAwesomeIcons.water, text: 'Hum $humid'),
-                    _ChipText(icon: FontAwesomeIcons.cloudRain, text: 'Precip $precip'),
+                    _ChipText(
+                      icon: FontAwesomeIcons.cloudRain,
+                      text: 'Precip $precip',
+                    ),
                     _ChipText(icon: FontAwesomeIcons.wind, text: 'Wind $wind'),
                   ],
                 ),
@@ -276,7 +308,10 @@ class _ChipText extends StatelessWidget {
         children: [
           FaIcon(icon, size: 12, color: scheme.onSurfaceVariant),
           const SizedBox(width: 6),
-          Text(text, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+          Text(
+            text,
+            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+          ),
         ],
       ),
     );
@@ -295,7 +330,10 @@ class _ForecastRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('5-Day Forecast', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text(
+          '5-Day Forecast',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -311,19 +349,30 @@ class _ForecastRow extends StatelessWidget {
               return Expanded(
                 child: Column(
                   children: [
-                    Text(label, style: TextStyle(color: scheme.onSurfaceVariant)),
+                    Text(
+                      label,
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
                     const SizedBox(height: 6),
                     Text(emoji, style: const TextStyle(fontSize: 22)),
                     const SizedBox(height: 6),
-                    Text('${d.highF.toStringAsFixed(0)}° / ${d.lowF.toStringAsFixed(0)}°',
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      '${d.highF.toStringAsFixed(0)}° / ${d.lowF.toStringAsFixed(0)}°',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const FaIcon(FontAwesomeIcons.cloudRain, size: 11),
                         const SizedBox(width: 4),
-                        Text('${d.precipProb.toStringAsFixed(0)}%', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+                        Text(
+                          '${d.precipProb.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -385,11 +434,17 @@ class MetricCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
               Text(
                 value,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -409,7 +464,9 @@ class MetricCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               subtitle,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -479,7 +536,9 @@ class _LinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LinePainter oldDelegate) {
-    return oldDelegate.series != series || oldDelegate.min != min || oldDelegate.max != max;
+    return oldDelegate.series != series ||
+        oldDelegate.min != min ||
+        oldDelegate.max != max;
   }
 }
 
@@ -514,15 +573,21 @@ class TrendCard extends StatelessWidget {
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
               const Spacer(),
-              Text(_current(series), style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                _current(series),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Expanded(child: Sparkline(series: series, minMax: minMax)),
+          Expanded(
+            child: Sparkline(series: series, minMax: minMax),
+          ),
         ],
       ),
     );
   }
 
-  String _current(List<double> s) => s.isEmpty ? '—' : s.last.toStringAsFixed(1);
+  String _current(List<double> s) =>
+      s.isEmpty ? '—' : s.last.toStringAsFixed(1);
 }
