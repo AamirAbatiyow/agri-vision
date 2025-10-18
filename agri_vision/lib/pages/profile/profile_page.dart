@@ -6,10 +6,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../services/chat_store.dart';
+import '../../services/chat_api.dart';
 import '../../services/user_prefs.dart';
 import '../../services/activity_service.dart';
-import '../../services/achievements_api.dart';
 import '../auth/auth_gate.dart';
+import '../results/analysis_results_page.dart'; // NEW: pretty results viewer
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -25,44 +26,67 @@ class _ProfilePageState extends State<ProfilePage> {
   int _generalSent = 0;
   int _dmSent = 0;
   DateTime? _lastActive;
+  int _analyses = 0;
+
+  bool _loadingCounts = false;
 
   @override
   void initState() {
     super.initState();
     ActivityService.I.onProfileVisited();
-    _recomputeActivity();
+    _analyses = ActivityService.I.photoAnalyses; // local counter
+    _refreshCounters(); // pull from server so it works even if chat tabs weren’t opened
   }
 
-  void _recomputeActivity() async {
-    final me = UserSession.username;
-    final g = ChatStore.I.general.where((m) => m.senderUser == me).toList();
-    _generalSent = g.length;
+  Future<void> _refreshCounters() async {
+    setState(() => _loadingCounts = true);
+    try {
+      final me = UserSession.username;
 
-    int dmCount = 0;
-    DateTime? last;
-    for (final peer in ChatStore.I.dmPeersByRecency()) {
-      final thread = ChatStore.I.dmThread(peer);
-      for (final m in thread) {
-        if (m.senderUser == me) dmCount++;
-        last = _maxTime(last, m.ts);
+      // --- General messages (count mine, capture last ts) ---
+      final generalRows = await ChatApi.fetchGeneral(afterIso: null, limit: 1000);
+      final myGen = generalRows.where((m) => m.sender == me).toList();
+      int generalCount = myGen.length;
+      DateTime? last = _maxTimeList(generalRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList());
+
+      // --- DM threads, then fetch each thread to count mine and latest ts ---
+      final threads = await ChatApi.fetchThreads(me); // [{peer, lastTs}]
+      int dmCount = 0;
+      for (final t in threads) {
+        final peer = (t['peer'] ?? '').toString();
+        if (peer.isEmpty) continue;
+        final dmRows = await ChatApi.fetchDm(a: me, b: peer, afterIso: null, limit: 1000);
+        dmCount += dmRows.where((m) => m.sender == me).length;
+        final dmLast = _maxTimeList(dmRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList());
+        if (dmLast != null) last = _maxTime(last, dmLast);
       }
-    }
-    _dmSent = dmCount;
-    for (final m in g) {
-      last = _maxTime(last, m.ts);
-    }
-    _lastActive = last;
 
-    // sync achievements (idempotent on server)
-    final badges = _computeBadges(tosyncOnly: true);
-    for (final b in badges) {
-      await AchievementsApi.addBadge(me, b.title);
+      setState(() {
+        _generalSent = generalCount;
+        _dmSent = dmCount;
+        _lastActive = last;
+      });
+    } catch (_) {
+      // keep silent; UI stays as-is
+    } finally {
+      if (mounted) setState(() => _loadingCounts = false);
     }
-
-    if (mounted) setState(() {});
   }
 
-  DateTime _maxTime(DateTime? a, DateTime b) => (a == null || b.isAfter(a)) ? b : a;
+  DateTime? _maxTime(DateTime? a, DateTime? b) {
+    if (a == null) return b;
+    if (b == null) return a;
+    return b.isAfter(a) ? b : a;
+  }
+
+  DateTime? _maxTimeList(List<DateTime?> arr) {
+    DateTime? best;
+    for (final t in arr) {
+      if (t == null) continue;
+      best = _maxTime(best, t);
+    }
+    return best;
+  }
 
   Future<void> _pickAvatar() async {
     final x = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1024);
@@ -91,7 +115,6 @@ class _ProfilePageState extends State<ProfilePage> {
     if (choice != null) {
       setState(() => UserPrefs.farmType = choice);
       _snack('Farm type updated');
-      // optional: persist as a badge if you want
     }
   }
 
@@ -134,32 +157,16 @@ class _ProfilePageState extends State<ProfilePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  List<_Badge> _computeBadges({bool tosyncOnly = false}) {
-    final b = <_Badge>[];
-
-    // Chat & onboarding
-    if (_generalSent >= 1) b.add(const _Badge('First Hello', FontAwesomeIcons.solidFaceSmile));
-    if (_generalSent >= 10) b.add(const _Badge('Community Regular', FontAwesomeIcons.comments));
-    if (_dmSent >= 1) b.add(const _Badge('DM Starter', FontAwesomeIcons.envelope));
-    if (UserPrefs.farmType.isNotEmpty) b.add(const _Badge('Farm Setup Complete', FontAwesomeIcons.tractor));
-    if (UserPrefs.region.isNotEmpty && UserPrefs.region != '—') b.add(const _Badge('Region Set', FontAwesomeIcons.locationDot));
-
-    // Activity-based
-    final act = ActivityService.I;
-    if (act.photoAnalyses >= 1) b.add(const _Badge('First Crop Scan', FontAwesomeIcons.seedling));
-    if (act.photoAnalyses >= 3) b.add(const _Badge('AI Analyst', FontAwesomeIcons.robot));
-    if (act.dashboardViews >= 5) b.add(const _Badge('Weather Watcher', FontAwesomeIcons.cloudSun));
-    if (act.sensorTicks >= 20) b.add(const _Badge('Moisture Master', FontAwesomeIcons.water));
-    if (act.visitedAllTabs) b.add(const _Badge('AgriVision Pioneer', FontAwesomeIcons.award));
-
-    // When showing UI, we keep icons; when syncing, server only needs titles.
-    return b;
+  String _fmtTime(DateTime t) {
+    final hh = t.hour % 12 == 0 ? 12 : t.hour % 12;
+    final mm = t.minute.toString().padLeft(2, '0');
+    final ampm = t.hour >= 12 ? 'PM' : 'AM';
+    return '$hh:$mm $ampm';
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final badges = _computeBadges();
 
     return Scaffold(
       appBar: AppBar(
@@ -167,8 +174,10 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           IconButton(
             tooltip: 'Refresh activity',
-            icon: const FaIcon(FontAwesomeIcons.rotate),
-            onPressed: _recomputeActivity,
+            icon: _loadingCounts
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const FaIcon(FontAwesomeIcons.rotate),
+            onPressed: _loadingCounts ? null : _refreshCounters,
           ),
         ],
       ),
@@ -198,7 +207,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Text(UserSession.displayName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                         Text('@${UserSession.username}', style: TextStyle(color: scheme.onSurfaceVariant)),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Wrap(
                           spacing: 8,
                           runSpacing: -6,
@@ -214,6 +223,55 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
           ),
+
+          const SizedBox(height: 12),
+
+          _Card(
+            child: Column(
+              children: [
+                const ListTile(
+                  leading: FaIcon(FontAwesomeIcons.chartLine),
+                  title: Text('Your Activity'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Row(
+                    children: [
+                      _Stat(label: 'General Sent', value: '$_generalSent', icon: FontAwesomeIcons.earthAmericas),
+                      _Stat(label: 'DMs Sent', value: '$_dmSent', icon: FontAwesomeIcons.message),
+                      _Stat(label: 'Analyses', value: '$_analyses', icon: FontAwesomeIcons.magnifyingGlassChart),
+                      _Stat(label: 'Last Active', value: _lastActive == null ? '—' : _fmtTime(_lastActive!), icon: FontAwesomeIcons.clock),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Pretty results viewer shortcut (no changes to camera_page.dart)
+          _Card(
+            child: ListTile(
+              leading: const FaIcon(FontAwesomeIcons.flask),
+              title: const Text('View Latest Analysis Results'),
+              subtitle: const Text('Polished display for /results and /ai_results'),
+              trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
+              onTap: () async {
+                // Open results viewer; if it fetched successfully, bump analyses count
+                final ok = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(builder: (_) => const AnalysisResultsPage()),
+                );
+                if (ok == true) {
+                  setState(() {
+                    _analyses += 1;
+                    ActivityService.I.onPhotoAnalyzed(); // keep local service in sync
+                  });
+                }
+              },
+            ),
+          ),
+
           const SizedBox(height: 12),
 
           _Card(
@@ -237,49 +295,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-
-          _Card(
-            child: Column(
-              children: [
-                const ListTile(
-                  leading: FaIcon(FontAwesomeIcons.chartLine),
-                  title: Text('Your Activity'),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Row(
-                    children: [
-                      _Stat(label: 'General Sent', value: '$_generalSent', icon: FontAwesomeIcons.earthAmericas),
-                      _Stat(label: 'DMs Sent', value: '$_dmSent', icon: FontAwesomeIcons.message),
-                      _Stat(label: 'Analyses', value: '${ActivityService.I.photoAnalyses}', icon: FontAwesomeIcons.magnifyingGlassChart),
-                      _Stat(label: 'Last Active', value: _lastActive == null ? '—' : _fmtTime(_lastActive!), icon: FontAwesomeIcons.clock),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          if (badges.isNotEmpty)
-            _Card(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Achievements', style: TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: badges.map((b) => _BadgeChip(b: b, scheme: scheme)).toList(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
           const SizedBox(height: 12),
 
@@ -295,13 +310,6 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
-  }
-
-  String _fmtTime(DateTime t) {
-    final hh = t.hour % 12 == 0 ? 12 : t.hour % 12;
-    final mm = t.minute.toString().padLeft(2, '0');
-    final ampm = t.hour >= 12 ? 'PM' : 'AM';
-    return '$hh:$mm $ampm';
   }
 }
 
@@ -374,37 +382,6 @@ class _Stat extends StatelessWidget {
             Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Badge {
-  final String title;
-  final IconData icon;
-  const _Badge(this.title, this.icon);
-}
-
-class _BadgeChip extends StatelessWidget {
-  final _Badge b;
-  final ColorScheme scheme;
-  const _BadgeChip({required this.b, required this.scheme});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FaIcon(b.icon, size: 12, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 6),
-          Text(b.title, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
-        ],
       ),
     );
   }
