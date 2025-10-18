@@ -30,7 +30,6 @@ def now_utc_iso():
 def ping():
     return {"ok": True, "time": now_utc_iso()}
 
-
 # ---------------------------
 # Users API - Create User (Signup)
 # ---------------------------
@@ -42,7 +41,6 @@ def create_user():
 
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
-
 
     if db.users.find_one({"username": username}):
         return jsonify({"error": "Username already exists"}), 400
