@@ -23,10 +23,6 @@ class _AgriVisionAppState extends State<AgriVisionApp> {
   @override
   void initState() {
     super.initState();
-    // Listen for theme changes
-    UserPrefs.onThemeChanged = () {
-      setState(() {});
-    };
   }
 
   @override
