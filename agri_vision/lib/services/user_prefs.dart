@@ -1,53 +1,75 @@
 // lib/services/user_prefs.dart
-import 'package:flutter/material.dart';
 
+/// Stores the currently logged-in user's info (local session only).
+class UserSession {
+  static String username = '';
+  static String displayName = '';
+
+  static bool get isLoggedIn => username.isNotEmpty;
+
+  static void login(String user) {
+    username = user;
+    displayName = user; // can be customized later
+  }
+
+  static void logout() {
+    username = '';
+    displayName = '';
+  }
+}
+
+/// Optional preferences & display settings used across the app.
+/// Includes unit conversions + toggles required by the dashboard.
 class UserPrefs {
+  // Profile-ish prefs
   static String farmType = '';
   static String region = '';
+  static String soilType = '';
+  static String favoriteCrop = '';
 
-  // Unit preferences
-  static bool useCelsius = false; // false = Fahrenheit, true = Celsius
-  static bool useKph = false; // false = mph, true = kph
+  // ---- Units / display settings ----
+  // Temperature stored natively in WeatherService as Fahrenheit; convert on demand.
+  static bool _useFahrenheit = true; // default to °F
+  static bool _useMph = true;        // default to mph
 
-  // Theme preferences
-  static bool isDarkMode = false;
-  static VoidCallback? onThemeChanged;
+  static bool isDarkMode = false;    // simple flag for UI; your theme can read this
 
-  static bool get isOnboarded => farmType.isNotEmpty && region.isNotEmpty;
+  // ---- Temperature helpers ----
+  static String tempUnit() => _useFahrenheit ? '°F' : '°C';
 
-  static void setOnboarding({required String farm, required String reg}) {
-    farmType = farm.trim();
-    region = reg.trim();
+  /// Input: Fahrenheit. Output: Fahrenheit or Celsius depending on setting.
+  static double convertTemp(double tempF) {
+    if (_useFahrenheit) return tempF;
+    return (tempF - 32.0) * (5.0 / 9.0);
   }
-
-  static void reset() {
-    farmType = '';
-    region = '';
-  }
-
-  // Unit conversion helpers
-  static double convertTemp(double fahrenheit) {
-    return useCelsius ? (fahrenheit - 32) * 5 / 9 : fahrenheit;
-  }
-
-  static String tempUnit() => useCelsius ? '°C' : '°F';
-
-  static double convertSpeed(double mph) {
-    return useKph ? mph * 1.60934 : mph;
-  }
-
-  static String speedUnit() => useKph ? 'kph' : 'mph';
 
   static void toggleTempUnit() {
-    useCelsius = !useCelsius;
+    _useFahrenheit = !_useFahrenheit;
+  }
+
+  // ---- Speed helpers ----
+  static String speedUnit() => _useMph ? 'mph' : 'km/h';
+
+  /// Input: mph. Output: mph or km/h depending on setting.
+  static double convertSpeed(double mph) {
+    if (_useMph) return mph;
+    return mph * 1.60934;
   }
 
   static void toggleSpeedUnit() {
-    useKph = !useKph;
+    _useMph = !_useMph;
   }
 
+  // ---- Dark mode toggle (flag only; wire to ThemeMode if desired) ----
   static void toggleDarkMode() {
     isDarkMode = !isDarkMode;
-    onThemeChanged?.call();
+  }
+
+  // Resets profile-style fields (not units)
+  static void reset() {
+    farmType = '';
+    region = '';
+    soilType = '';
+    favoriteCrop = '';
   }
 }

@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/chat_store.dart';
 import 'dm_chat_page.dart';
+import '../../services/user_prefs.dart';
 
 class GeneralChatPage extends StatefulWidget {
   const GeneralChatPage({super.key});

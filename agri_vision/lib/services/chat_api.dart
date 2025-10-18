@@ -1,59 +1,48 @@
 // lib/services/chat_api.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'api_client.dart';
+//
+// Shim so existing pages that reference `ChatAPI` keep working.
+// This forwards to ChatApi (defined in chat_store.dart).
 
-class ChatMessageDto {
-  final String room; // "general" or "dm"
-  final String sender;
-  final String text;
-  final String ts;
-  final List<String>? participants; // for DM only
+// Re-export DTOs so other files can import them from here if they want.
+export 'chat_store.dart' show GeneralDto, DmDto;
 
-  ChatMessageDto({required this.room, required this.sender, required this.text, required this.ts, this.participants});
+// Import the real implementation and the DTOs for use in signatures.
+import 'chat_store.dart' show ChatApi, GeneralDto, DmDto;
 
-  factory ChatMessageDto.fromMap(Map<String, dynamic> m) => ChatMessageDto(
-        room: m['room'] ?? 'general',
-        sender: m['sender'] ?? '',
-        text: m['text'] ?? '',
-        ts: m['ts'] ?? '',
-        participants: (m['participants'] as List?)?.map((e) => e.toString()).toList(),
-      );
-}
+class ChatAPI {
+  static const String baseUrl = ChatApi.baseUrl;
 
-class ChatApi {
-  static Future<bool> postGeneral({required String sender, required String text}) async {
-    final res = await ApiClient.I.postJson('/messages', {'room': 'general', 'sender': sender, 'text': text});
-    return res.statusCode == 201;
-  }
+  // -------- General --------
+  static Future<List<GeneralDto>> fetchGeneral({
+    String? afterIso,
+    int limit = 200,
+  }) =>
+      ChatApi.fetchGeneral(afterIso: afterIso, limit: limit);
 
-  static Future<bool> postDm({required String a, required String b, required String sender, required String text}) async {
-    final res = await ApiClient.I.postJson('/messages', {'room': 'dm', 'a': a, 'b': b, 'sender': sender, 'text': text});
-    return res.statusCode == 201;
-  }
+  static Future<void> postGeneral({
+    required String sender,
+    required String text,
+  }) =>
+      ChatApi.postGeneral(sender: sender, text: text);
 
-  static Future<List<ChatMessageDto>> fetchGeneral({String? afterIso, int limit = 200}) async {
-    final params = <String, String>{'limit': '$limit'};
-    if (afterIso != null) params['after'] = afterIso;
-    final http.Response r = await ApiClient.I.getRaw('/messages/general', params);
-    if (r.statusCode != 200) return [];
-    final arr = jsonDecode(r.body) as List;
-    return arr.map((e) => ChatMessageDto.fromMap(e as Map<String, dynamic>)).toList();
-  }
+  // -------- DMs --------
+  static Future<List<DmDto>> fetchDm({
+    required String a,
+    required String b,
+    String? afterIso,
+    int limit = 200,
+  }) =>
+      ChatApi.fetchDm(a: a, b: b, afterIso: afterIso, limit: limit);
 
-  static Future<List<ChatMessageDto>> fetchDm({required String a, required String b, String? afterIso, int limit = 200}) async {
-    final params = <String, String>{'a': a, 'b': b, 'limit': '$limit'};
-    if (afterIso != null) params['after'] = afterIso;
-    final http.Response r = await ApiClient.I.getRaw('/messages/dm', params);
-    if (r.statusCode != 200) return [];
-    final arr = jsonDecode(r.body) as List;
-    return arr.map((e) => ChatMessageDto.fromMap(e as Map<String, dynamic>)).toList();
-  }
+  static Future<void> postDm({
+    required String a,
+    required String b,
+    required String sender,
+    required String text,
+  }) =>
+      ChatApi.postDm(a: a, b: b, sender: sender, text: text);
 
-  static Future<List<Map<String, dynamic>>> fetchThreads(String username) async {
-    final r = await ApiClient.I.getRaw('/messages/threads/$username');
-    if (r.statusCode != 200) return [];
-    final arr = jsonDecode(r.body) as List;
-    return arr.cast<Map<String, dynamic>>();
-  }
+  // -------- Threads --------
+  static Future<List<Map<String, dynamic>>> fetchThreads(String username) =>
+      ChatApi.fetchThreads(username);
 }

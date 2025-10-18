@@ -1,219 +1,210 @@
 // lib/pages/auth/signup_page.dart
 import 'dart:convert';
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../../services/chat_store.dart'; // UserSession
-import '../../services/user_prefs.dart'; // onboarding storage (farmType/region)
+import '../../services/user_prefs.dart';
 import '../shell/home_shell.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
+
   @override
   State<SignupPage> createState() => _SignupPageState();
 }
 
 class _SignupPageState extends State<SignupPage> {
-  final _form = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  bool _obscure1 = true, _obscure2 = true, _loading = false;
 
-  String get _apiBase {
-    if (!kIsWeb && Platform.isAndroid) return 'http://10.102.96.77:8000';
-    return 'http://127.0.0.1:5000';
-  }
+  bool _busy = false;
+  String? _error;
+
+  // Android emulator -> host machine
+  static const String _backend = 'http://10.0.2.2:5000';
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
+    _userCtrl.dispose();
     _passCtrl.dispose();
-    _confirmCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!(_form.currentState?.validate() ?? false)) return;
-    setState(() => _loading = true);
+  Future<void> _signup() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    final username = _nameCtrl.text.trim();
+    final username = _userCtrl.text.trim();
     final password = _passCtrl.text;
 
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
     try {
-      final url = Uri.parse('$_apiBase/users'); // Flask "create user"
-      final res = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': username,
-          'password': password,
-          'joined': _joinedLabel(), // optional; matches your example
-        }),
-      );
+      final res = await http
+          .post(
+            Uri.parse('$_backend/users'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'username': username,
+              'password': password,
+              'joined': 'Oct 2025',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (res.statusCode == 201) {
-        // Set local session (username == display name)
-        UserSession.set(user: username, name: username);
+        // ✅ Create local session
+        UserSession.login(username);
 
-        // Collect onboarding (Farm Type + Region) locally
-        final ok = await _showOnboardingSheet();
+        // ✅ Onboarding right after successful signup
+        if (!mounted) return;
+        final ok = await _showOnboarding(context);
         if (!mounted) return;
 
-        if (ok == true) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const HomeShell()),
-            (route) => false,
-          );
-        } else {
-          setState(() => _loading = false);
-        }
+        // You could persist onboarding prefs to a backend later if needed.
+        // For now, navigate to the app shell.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeShell()),
+          (route) => false,
+        );
+        return;
       } else {
-        final body = _safeDecode(res.body);
-        _toast(body['error'] ?? 'Failed to create user (${res.statusCode})');
+        // Try to show server error if returned
+        String msg = 'Failed to create user.';
+        try {
+          final body = jsonDecode(res.body);
+          if (body is Map && body['error'] != null) {
+            msg = body['error'].toString();
+          }
+        } catch (_) {}
+        setState(() => _error = '$msg (HTTP ${res.statusCode})');
       }
     } catch (e) {
-      _toast('Network error: $e');
+      setState(() => _error = 'Network error: $e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  Map<String, dynamic> _safeDecode(String s) {
-    try {
-      return jsonDecode(s) as Map<String, dynamic>;
-    } catch (_) {
-      return {};
-    }
-  }
+  Future<bool> _showOnboarding(BuildContext context) async {
+    // Local controllers for onboarding fields
+    String farmType = UserPrefs.farmType;
+    final regionCtrl = TextEditingController(text: UserPrefs.region);
+    final soilCtrl = TextEditingController(text: UserPrefs.soilType);
+    final favCtrl = TextEditingController(text: UserPrefs.favoriteCrop);
 
-  String _joinedLabel() {
-    final now = DateTime.now();
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[now.month - 1]} ${now.year}';
-  }
-
-  Future<bool?> _showOnboardingSheet() {
-    final farm = ValueNotifier<String>('Greenhouse');
-    final region = TextEditingController();
-
-    return showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 8,
-              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Set up your farm',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 12),
+        final scheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            top: 8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Set up your farm',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
 
-                // Farm type picker
-                ValueListenableBuilder<String>(
-                  valueListenable: farm,
-                  builder: (_, v, __) => ListTile(
-                    leading: const Icon(Icons.agriculture),
-                    title: const Text('Farm Type'),
-                    subtitle: Text(v),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      final pick = await showModalBottomSheet<String>(
-                        context: context,
-                        showDragHandle: true,
-                        builder: (_) => SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (final f in const [
-                                'Greenhouse',
-                                'Crop Farm',
-                                'Orchard',
-                                'Hydroponic',
-                                'Backyard Garden',
-                              ])
-                                ListTile(
-                                  title: Text(f),
-                                  onTap: () => Navigator.pop(context, f),
-                                ),
-                              const SizedBox(height: 8),
-                            ],
-                          ),
-                        ),
-                      );
-                      if (pick != null) farm.value = pick;
-                    },
+              // Farm type
+              DropdownButtonFormField<String>(
+                value: farmType.isEmpty ? null : farmType,
+                items: const [
+                  DropdownMenuItem(value: 'Greenhouse', child: Text('Greenhouse')),
+                  DropdownMenuItem(value: 'Crop Farm', child: Text('Crop Farm')),
+                  DropdownMenuItem(value: 'Orchard', child: Text('Orchard')),
+                  DropdownMenuItem(value: 'Hydroponic', child: Text('Hydroponic')),
+                  DropdownMenuItem(value: 'Backyard Garden', child: Text('Backyard Garden')),
+                ],
+                onChanged: (v) => farmType = v ?? '',
+                decoration: const InputDecoration(
+                  labelText: 'Farm Type',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Region
+              TextField(
+                controller: regionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Region',
+                  hintText: 'e.g., Midwest, Pacific NW',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Soil type
+              TextField(
+                controller: soilCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Soil Type',
+                  hintText: 'e.g., loam, sandy loam, clay',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Favorite crop
+              TextField(
+                controller: favCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Favorite Crop',
+                  hintText: 'e.g., tomatoes, corn, wheat',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Skip for now'),
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Region field
-                TextField(
-                  controller: region,
-                  decoration: const InputDecoration(
-                    labelText: 'Region',
-                    hintText: 'e.g., Midwest, Pacific NW',
-                    border: OutlineInputBorder(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        // Save to local prefs (in-memory for now)
+                        UserPrefs.farmType = farmType;
+                        UserPrefs.region = regionCtrl.text.trim();
+                        UserPrefs.soilType = soilCtrl.text.trim();
+                        UserPrefs.favoriteCrop = favCtrl.text.trim();
+                        Navigator.pop(context, true);
+                      },
+                      child: const Text('Save'),
+                    ),
                   ),
-                  textInputAction: TextInputAction.done,
-                ),
-
-                const SizedBox(height: 12),
-
-                // Continue
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () {
-                      UserPrefs.setOnboarding(
-                        farm: farm.value,
-                        reg: region.text.trim().isEmpty
-                            ? '—'
-                            : region.text.trim(),
-                      );
-                      Navigator.pop(context, true);
-                    },
-                    child: const Text('Continue'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'You can edit these later in Profile.',
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+              ),
+            ],
           ),
         );
       },
     );
-  }
 
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    return (result ?? false);
   }
 
   @override
@@ -221,106 +212,85 @@ class _SignupPageState extends State<SignupPage> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create account')),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(
-                'Join AgriVision',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+      appBar: AppBar(title: const Text('Create an account')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.agriculture, size: 64),
+                const SizedBox(height: 8),
+                const Text(
+                  'AgriVision',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your username will also be your display name.',
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Username == Display name
-              TextFormField(
-                controller: _nameCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Username (shown in chat)',
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Enter a username' : null,
-              ),
-              const SizedBox(height: 12),
-
-              // Password
-              TextFormField(
-                controller: _passCtrl,
-                obscureText: _obscure1,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure1 = !_obscure1),
-                    icon: Icon(
-                      _obscure1 ? Icons.visibility : Icons.visibility_off,
+                if (_error != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: scheme.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: scheme.error),
+                    ),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(color: scheme.onErrorContainer),
                     ),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _userCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Username',
+                          border: OutlineInputBorder(),
+                        ),
+                        textInputAction: TextInputAction.next,
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Enter username' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _passCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          border: OutlineInputBorder(),
+                        ),
+                        obscureText: true,
+                        onFieldSubmitted: (_) => _signup(),
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Enter password' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          icon: _busy
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.person_add_alt_1),
+                          label: Text(_busy ? 'Creating...' : 'Create Account'),
+                          onPressed: _busy ? null : _signup,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                validator: (v) => (v == null || v.length < 4)
-                    ? 'Use at least 4 characters'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-
-              // Confirm
-              TextFormField(
-                controller: _confirmCtrl,
-                obscureText: _obscure2,
-                onFieldSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  labelText: 'Confirm password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure2 = !_obscure2),
-                    icon: Icon(
-                      _obscure2 ? Icons.visibility : Icons.visibility_off,
-                    ),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (v) =>
-                    (v != _passCtrl.text) ? 'Passwords do not match' : null,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Create button
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.person_add_alt_1),
-                  label: Text(_loading ? 'Creating…' : 'Create account'),
-                  onPressed: _loading ? null : _submit,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

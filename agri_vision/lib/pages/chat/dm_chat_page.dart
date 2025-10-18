@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/chat_store.dart';
-
+import '../../services/user_prefs.dart';
 class DmChatPage extends StatefulWidget {
   final String peerUsername; // who you're chatting with
   const DmChatPage({super.key, required this.peerUsername});
