@@ -18,23 +18,46 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final Stream<SensorSnapshot> _sensor$;
   late final Stream<WeatherNow> _weather$;
-  late List<WeatherDay> _forecast;
+  List<WeatherDay> _forecast = [];
 
-  // rolling history for sparklines (all from weather API)
-  final List<double> tempHistory = [];
-  final List<double> precipHistory = [];
-  final List<double> moistHistory = []; // soil moisture from API
-  final List<double> humidHistory = [];
-  final List<double> windHistory = [];
-  final List<double> sunHistory = []; // solar radiation from API
+  // Get hourly trends from weather service (past 12h + next 12h)
+  List<double> get tempHistory =>
+      WeatherService.I.hourlyTrends['temperature'] ?? [];
+  List<double> get precipHistory =>
+      WeatherService.I.hourlyTrends['precipitation'] ?? [];
+  List<double> get moistHistory =>
+      WeatherService.I.hourlyTrends['soilMoisture'] ?? [];
+  List<double> get humidHistory =>
+      WeatherService.I.hourlyTrends['humidity'] ?? [];
+  List<double> get windHistory => WeatherService.I.hourlyTrends['wind'] ?? [];
+  List<double> get sunHistory =>
+      WeatherService.I.hourlyTrends['solarRadiation'] ?? [];
 
   @override
   void initState() {
     super.initState();
     _sensor$ = SensorService.I.start();
     _weather$ = WeatherService.I.start();
-    _forecast = WeatherService.I.forecast();
+    _loadForecast();
     ActivityService.I.onDashboardViewed();
+  }
+
+  Future<void> _loadForecast() async {
+    // Wait a moment for the initial forecast fetch to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {
+        _forecast = WeatherService.I.forecast();
+        debugPrint('Dashboard loaded ${_forecast.length} forecast days');
+      });
+    }
+
+    // Periodically refresh forecast every minute to pick up updates
+    Future.delayed(const Duration(minutes: 1), () {
+      if (mounted) {
+        _loadForecast();
+      }
+    });
   }
 
   @override
@@ -42,11 +65,6 @@ class _DashboardPageState extends State<DashboardPage> {
     SensorService.I.stop();
     WeatherService.I.stop();
     super.dispose();
-  }
-
-  void _push(List<double> list, double v, {int max = 30}) {
-    list.add(v);
-    if (list.length > max) list.removeAt(0);
   }
 
   @override
@@ -84,15 +102,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
 
-              // Use real weather data for all metrics
-              if (weather != null) {
-                _push(tempHistory, weather.tempF);
-                _push(precipHistory, weather.precipProb);
-                _push(humidHistory, weather.humidity);
-                _push(windHistory, weather.windMph);
-                _push(moistHistory, weather.soilMoisture);
-                _push(sunHistory, weather.solarRadiation);
-              }
+              // Hourly trends are now managed by WeatherService
+              // No need to manually push data - just use the getter
 
               return CustomScrollView(
                 slivers: [
@@ -126,6 +137,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: scheme.primaryContainer,
                           sparkline: tempHistory,
                           minMax: const MinMax(50, 100),
+                          showNowMarker: true,
                         ),
                         MetricCard(
                           title: 'Precipitation',
@@ -139,6 +151,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: scheme.secondaryContainer,
                           sparkline: precipHistory,
                           minMax: const MinMax(0, 100),
+                          showNowMarker: true,
                         ),
                         MetricCard(
                           title: 'Soil Moisture',
@@ -158,6 +171,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: scheme.tertiaryContainer,
                           sparkline: moistHistory,
                           minMax: const MinMax(0, 100),
+                          showNowMarker: true,
                         ),
                         MetricCard(
                           title: 'Humidity',
@@ -171,6 +185,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: scheme.surfaceContainerHighest,
                           sparkline: humidHistory,
                           minMax: const MinMax(0, 100),
+                          showNowMarker: true,
                         ),
                         MetricCard(
                           title: 'Wind',
@@ -186,6 +201,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: scheme.surfaceContainerHigh,
                           sparkline: windHistory,
                           minMax: const MinMax(0, 25),
+                          showNowMarker: true,
                         ),
                         MetricCard(
                           title: 'Sunlight',
@@ -203,6 +219,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: scheme.surfaceContainerLow,
                           sparkline: sunHistory,
                           minMax: const MinMax(0, 120),
+                          showNowMarker: true,
                         ),
                       ],
                     ),
@@ -224,15 +241,18 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           const SizedBox(height: 12),
                           TrendCard(
-                            title: 'Temperature (last 60s)',
+                            title: 'Temperature (12h past ← now → 12h future)',
                             series: tempHistory,
-                            minMax: const MinMax(50, 100),
+                            minMax: const MinMax(40, 100),
+                            showNowMarker: true,
                           ),
                           const SizedBox(height: 12),
                           TrendCard(
-                            title: 'Soil Moisture (last 60s)',
+                            title:
+                                'Soil Moisture (12h past ← now → 12h future)',
                             series: moistHistory,
                             minMax: const MinMax(0, 100),
+                            showNowMarker: true,
                           ),
                         ],
                       ),
@@ -384,44 +404,57 @@ class _ForecastRow extends StatelessWidget {
             border: Border.all(color: scheme.outlineVariant),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          child: Row(
-            children: days.map((d) {
-              final emoji = WeatherView.emojiFor(d.condition);
-              final label = WeatherView.shortLabel(d.day);
-              return Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      label,
+          child: days.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Text(
+                      'Loading forecast...',
                       style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
-                    const SizedBox(height: 6),
-                    Text(emoji, style: const TextStyle(fontSize: 22)),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${d.highF.toStringAsFixed(0)}° / ${d.lowF.toStringAsFixed(0)}°',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const FaIcon(FontAwesomeIcons.cloudRain, size: 11),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${d.precipProb.toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 12,
+                  ),
+                )
+              : Row(
+                  children: days.map((d) {
+                    final emoji = WeatherView.emojiFor(d.condition);
+                    final label = WeatherView.shortLabel(d.day);
+                    return Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            label,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(height: 6),
+                          Text(emoji, style: const TextStyle(fontSize: 22)),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${d.highF.toStringAsFixed(0)}° / ${d.lowF.toStringAsFixed(0)}°',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const FaIcon(
+                                FontAwesomeIcons.cloudRain,
+                                size: 11,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${d.precipProb.toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
         ),
       ],
     );
@@ -444,6 +477,7 @@ class MetricCard extends StatelessWidget {
   final Color color;
   final List<double> sparkline;
   final MinMax minMax;
+  final bool showNowMarker;
 
   const MetricCard({
     super.key,
@@ -454,6 +488,7 @@ class MetricCard extends StatelessWidget {
     required this.color,
     required this.sparkline,
     required this.minMax,
+    this.showNowMarker = false,
   });
 
   @override
@@ -497,7 +532,11 @@ class MetricCard extends StatelessWidget {
               child: Container(
                 alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Sparkline(series: sparkline, minMax: minMax),
+                child: Sparkline(
+                  series: sparkline,
+                  minMax: minMax,
+                  showNowMarker: showNowMarker,
+                ),
               ),
             ),
           ),
@@ -522,13 +561,24 @@ class MetricCard extends StatelessWidget {
 class Sparkline extends StatelessWidget {
   final List<double> series;
   final MinMax minMax;
+  final bool showNowMarker;
 
-  const Sparkline({super.key, required this.series, required this.minMax});
+  const Sparkline({
+    super.key,
+    required this.series,
+    required this.minMax,
+    this.showNowMarker = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _LinePainter(series: series, min: minMax.min, max: minMax.max),
+      painter: _LinePainter(
+        series: series,
+        min: minMax.min,
+        max: minMax.max,
+        showNowMarker: showNowMarker,
+      ),
       size: Size.infinite,
     );
   }
@@ -538,8 +588,14 @@ class _LinePainter extends CustomPainter {
   final List<double> series;
   final double min;
   final double max;
+  final bool showNowMarker;
 
-  _LinePainter({required this.series, required this.min, required this.max});
+  _LinePainter({
+    required this.series,
+    required this.min,
+    required this.max,
+    this.showNowMarker = false,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -574,13 +630,44 @@ class _LinePainter extends CustomPainter {
     canvas.drawPath(base, basePaint);
 
     canvas.drawPath(path, paint);
+
+    // Draw "now" marker line in the middle
+    if (showNowMarker) {
+      final nowPaint = Paint()
+        ..color =
+            const Color(0xFFFF6B6B) // red accent for "now"
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
+      final nowX = size.width / 2;
+      canvas.drawLine(Offset(nowX, 0), Offset(nowX, size.height), nowPaint);
+
+      // Add a small "NOW" label at the bottom
+      final textPainter = TextPainter(
+        text: const TextSpan(
+          text: 'NOW',
+          style: TextStyle(
+            color: Color(0xFFFF6B6B),
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(nowX - textPainter.width / 2, size.height - textPainter.height),
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant _LinePainter oldDelegate) {
     return oldDelegate.series != series ||
         oldDelegate.min != min ||
-        oldDelegate.max != max;
+        oldDelegate.max != max ||
+        oldDelegate.showNowMarker != showNowMarker;
   }
 }
 
@@ -590,12 +677,14 @@ class TrendCard extends StatelessWidget {
   final String title;
   final List<double> series;
   final MinMax minMax;
+  final bool showNowMarker;
 
   const TrendCard({
     super.key,
     required this.title,
     required this.series,
     required this.minMax,
+    this.showNowMarker = false,
   });
 
   @override
@@ -623,7 +712,11 @@ class TrendCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: Sparkline(series: series, minMax: minMax),
+            child: Sparkline(
+              series: series,
+              minMax: minMax,
+              showNowMarker: showNowMarker,
+            ),
           ),
         ],
       ),

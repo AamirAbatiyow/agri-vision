@@ -71,6 +71,15 @@ class WeatherService {
   // Cache the latest weather data
   WeatherNow? _latestWeather;
 
+  // Cache hourly data for trends (past 12h + next 12h)
+  List<double> _hourlyTemps = [];
+  List<double> _hourlyPrecip = [];
+  List<double> _hourlyHumidity = [];
+  List<double> _hourlyWind = [];
+  List<double> _hourlySoilMoisture = [];
+  List<double> _hourlySolarRadiation = [];
+  DateTime? _hourlyDataTime;
+
   List<WeatherDay> _cachedForecast = [];
 
   /// Update the location for weather data manually (disables auto device location)
@@ -98,6 +107,19 @@ class WeatherService {
 
   /// Get the latest cached weather data (synchronous)
   WeatherNow? get latestWeather => _latestWeather;
+
+  /// Get hourly trend data (past 12h + next 12h)
+  Map<String, List<double>> get hourlyTrends => {
+    'temperature': _hourlyTemps,
+    'precipitation': _hourlyPrecip,
+    'humidity': _hourlyHumidity,
+    'wind': _hourlyWind,
+    'soilMoisture': _hourlySoilMoisture,
+    'solarRadiation': _hourlySolarRadiation,
+  };
+
+  /// Get when hourly trend data was last fetched
+  DateTime? get hourlyDataTime => _hourlyDataTime;
 
   /// Get device location and update coordinates
   Future<bool> _updateDeviceLocation() async {
@@ -163,6 +185,7 @@ class WeatherService {
       } else {
         _fetchAndBroadcast();
         _fetchForecast();
+        _fetchHourlyTrends(); // Update trends regularly
       }
     });
 
@@ -188,6 +211,7 @@ class WeatherService {
     }
     _fetchAndBroadcast();
     _fetchForecast();
+    _fetchHourlyTrends();
   }
 
   /// Fetch current weather from Open-Meteo API and broadcast
@@ -335,6 +359,91 @@ class WeatherService {
     return _cachedForecast;
   }
 
+  /// Fetch hourly trend data (past 12h + next 12h)
+  Future<void> _fetchHourlyTrends() async {
+    try {
+      final now = DateTime.now();
+      final startTime = now.subtract(const Duration(hours: 12));
+      final endTime = now.add(const Duration(hours: 12));
+
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?'
+        'latitude=$latitude&longitude=$longitude'
+        '&hourly=temperature_2m,precipitation_probability,'
+        'relative_humidity_2m,wind_speed_10m,'
+        'soil_moisture_0_to_7cm,shortwave_radiation'
+        '&temperature_unit=fahrenheit'
+        '&wind_speed_unit=mph'
+        '&start_hour=${startTime.toIso8601String().substring(0, 13)}'
+        '&end_hour=${endTime.toIso8601String().substring(0, 13)}'
+        '&timezone=auto',
+      );
+
+      debugPrint('Fetching hourly trends: $url');
+      final response = await http.get(url);
+
+      if (response.statusCode != 200) {
+        debugPrint('Hourly trends API Error: ${response.statusCode}');
+        return;
+      }
+
+      final data = json.decode(response.body);
+      final hourly = data['hourly'];
+
+      if (hourly == null) {
+        debugPrint('No hourly data available');
+        return;
+      }
+
+      // Extract temperature data
+      final temps = (hourly['temperature_2m'] as List?)?.cast<num>() ?? [];
+      _hourlyTemps = temps.map((t) => t.toDouble()).toList();
+
+      // Extract precipitation probability
+      final precips =
+          (hourly['precipitation_probability'] as List?)?.cast<num?>() ?? [];
+      _hourlyPrecip = precips.map((p) => (p ?? 0).toDouble()).toList();
+
+      // Extract humidity
+      final humidity =
+          (hourly['relative_humidity_2m'] as List?)?.cast<num>() ?? [];
+      _hourlyHumidity = humidity.map((h) => h.toDouble()).toList();
+
+      // Extract wind speed
+      final wind = (hourly['wind_speed_10m'] as List?)?.cast<num>() ?? [];
+      _hourlyWind = wind.map((w) => w.toDouble()).toList();
+
+      // Extract soil moisture (convert m³/m³ to %)
+      final soil =
+          (hourly['soil_moisture_0_to_7cm'] as List?)?.cast<num?>() ?? [];
+      _hourlySoilMoisture = soil.map((s) {
+        if (s == null) {
+          // Use humidity-based estimate if not available
+          final idx = soil.indexOf(s);
+          final hum = idx < _hourlyHumidity.length
+              ? _hourlyHumidity[idx]
+              : 50.0;
+          return (hum * 0.6).clamp(20.0, 80.0);
+        }
+        return (s.toDouble() * 200).clamp(0.0, 100.0);
+      }).toList();
+
+      // Extract solar radiation (convert W/m² to kLux)
+      final solar =
+          (hourly['shortwave_radiation'] as List?)?.cast<num?>() ?? [];
+      _hourlySolarRadiation = solar
+          .map(
+            (s) => s == null ? 0.0 : (s.toDouble() * 0.065).clamp(0.0, 120.0),
+          )
+          .toList();
+
+      _hourlyDataTime = now;
+      debugPrint('Fetched ${_hourlyTemps.length} hours of trend data');
+    } catch (e) {
+      debugPrint('Error fetching hourly trends: $e');
+    }
+  }
+
   /// Fetch forecast data from Open-Meteo API
   Future<void> _fetchForecast() async {
     try {
@@ -348,6 +457,7 @@ class WeatherService {
         '&forecast_days=5',
       );
 
+      debugPrint('Fetching forecast: $url');
       final response = await http.get(url);
 
       if (response.statusCode != 200) {
@@ -357,6 +467,11 @@ class WeatherService {
 
       final data = json.decode(response.body);
       final daily = data['daily'];
+
+      if (daily == null) {
+        debugPrint('No daily forecast data available');
+        return;
+      }
 
       final times = (daily['time'] as List);
       final maxTemps = (daily['temperature_2m_max'] as List);
@@ -373,8 +488,11 @@ class WeatherService {
           condition: _weatherCodeToCondition(weatherCodes[i] ?? 0),
         );
       });
-    } catch (e) {
+
+      debugPrint('Cached ${_cachedForecast.length} days of forecast');
+    } catch (e, stackTrace) {
       debugPrint('Error fetching forecast: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 
