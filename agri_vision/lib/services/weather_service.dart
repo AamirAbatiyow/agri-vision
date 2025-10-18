@@ -240,9 +240,10 @@ class WeatherService {
     if (!_locationInitialized) {
       await _updateDeviceLocation();
     }
+    // Fetch hourly trends first so current weather can use precip probability
+    await _fetchHourlyTrends();
     _fetchAndBroadcast();
     _fetchForecast();
-    _fetchHourlyTrends();
   }
 
   /// Fetch current weather from Open-Meteo API and broadcast
@@ -322,12 +323,30 @@ class WeatherService {
       final windMph = (current['wind_speed_10m'] ?? 5.0).toDouble();
       final weatherCode = current['weather_code'] ?? 0;
 
-      // Open-Meteo doesn't provide direct precipitation probability for current
-      // We'll use precipitation amount as a proxy (0 = 0%, >0 = some percentage)
-      final precipAmount = (current['precipitation'] ?? 0.0).toDouble();
-      final precipProb = precipAmount > 0
-          ? min(precipAmount * 30 + 20, 100.0)
-          : 0.0;
+      // Get precipitation probability from hourly data for current hour
+      // This is more accurate than using precipitation amount
+      double precipProb = 0.0;
+      debugPrint('Hourly precip array length: ${_hourlyPrecip.length}');
+
+      if (_hourlyPrecip.isNotEmpty && _hourlyPrecip.length >= 13) {
+        // Current hour is approximately at index 12 (middle of 24-hour range)
+        // 0-11 = past 12 hours, 12 = current hour, 13-24 = next 12 hours
+        precipProb = _hourlyPrecip[12];
+        debugPrint('Using hourly precip prob from index 12: $precipProb%');
+      } else if (_hourlyPrecip.isNotEmpty) {
+        // If we have some data but not enough, use the last available value
+        precipProb = _hourlyPrecip.last;
+        debugPrint('Using last available precip prob: $precipProb%');
+      } else {
+        // Fallback: use precipitation amount if hourly data not available
+        final precipAmount = (current['precipitation'] ?? 0.0).toDouble();
+        precipProb = precipAmount > 0
+            ? min(precipAmount * 30 + 20, 100.0)
+            : 0.0;
+        debugPrint(
+          'Hourly data not available, using precipitation amount fallback: $precipAmount inch → $precipProb%',
+        );
+      }
 
       // Soil moisture (m³/m³) - convert to percentage (0-100%)
       // Note: Not all locations have soil moisture data available
