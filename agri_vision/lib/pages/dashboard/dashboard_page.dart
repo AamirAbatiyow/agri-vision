@@ -76,12 +76,16 @@ class _DashboardPageState extends State<DashboardPage> {
         builder: (context, sensorSnap) {
           final scheme = Theme.of(context).colorScheme;
 
-          if (!sensorSnap.hasData) {
+          // Only show loading if we don't have cached weather data
+          // This allows instant display when revisiting the dashboard
+          if (!sensorSnap.hasData && WeatherService.I.latestWeather == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
           // Sensor data is still used for activity tracking
-          ActivityService.I.onSensorTick();
+          if (sensorSnap.hasData) {
+            ActivityService.I.onSensorTick();
+          }
 
           return StreamBuilder<WeatherNow>(
             stream: _weather$,

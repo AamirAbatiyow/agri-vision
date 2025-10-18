@@ -5,12 +5,12 @@ import 'dart:math';
 /// Point-in-time snapshot of field/environment readings.
 class SensorSnapshot {
   final DateTime ts;
-  final double temperatureF;   // °F
-  final double precipitation;  // %
-  final double soilMoisture;   // %
-  final double humidity;       // %
-  final double windMph;        // mph
-  final double sunlight;       // kLux (simulated)
+  final double temperatureF; // °F
+  final double precipitation; // %
+  final double soilMoisture; // %
+  final double humidity; // %
+  final double windMph; // mph
+  final double sunlight; // kLux (simulated)
 
   const SensorSnapshot({
     required this.ts,
@@ -38,13 +38,27 @@ class SensorService {
   double _p = 10; // precip %
   double _m = 60; // soil moisture %
   double _h = 55; // humidity %
-  double _w = 7;  // wind mph
+  double _w = 7; // wind mph
   double _s = 18; // sunlight kLux
 
   /// Start emitting snapshots every [period].
   /// Calling start() multiple times restarts the stream.
   Stream<SensorSnapshot> start({Duration period = const Duration(seconds: 2)}) {
     _timer?.cancel();
+
+    // Emit initial snapshot immediately
+    _controller.add(
+      SensorSnapshot(
+        ts: DateTime.now(),
+        temperatureF: _t,
+        precipitation: _p,
+        soilMoisture: _m,
+        humidity: _h,
+        windMph: _w,
+        sunlight: _s,
+      ),
+    );
+
     _timer = Timer.periodic(period, (_) {
       // Gentle noise + simple diurnal/weather heuristics
       _t = _clamp(_t + _noise(1.2), 58, 90);
@@ -54,15 +68,17 @@ class SensorService {
       _w = _clamp(_w + _noise(1.5), 0, 22);
       _s = _clamp(_s + _noise(2.5) + (_isDaytime ? 1.0 : -1.5), 0, 65);
 
-      _controller.add(SensorSnapshot(
-        ts: DateTime.now(),
-        temperatureF: _t,
-        precipitation: _p,
-        soilMoisture: _m,
-        humidity: _h,
-        windMph: _w,
-        sunlight: _s,
-      ));
+      _controller.add(
+        SensorSnapshot(
+          ts: DateTime.now(),
+          temperatureF: _t,
+          precipitation: _p,
+          soilMoisture: _m,
+          humidity: _h,
+          windMph: _w,
+          sunlight: _s,
+        ),
+      );
     });
     return _controller.stream;
   }

@@ -70,6 +70,7 @@ class WeatherService {
 
   // Cache the latest weather data
   WeatherNow? _latestWeather;
+  DateTime? _latestWeatherTime;
 
   // Cache hourly data for trends (past 12h + next 12h)
   List<double> _hourlyTemps = [];
@@ -81,6 +82,10 @@ class WeatherService {
   DateTime? _hourlyDataTime;
 
   List<WeatherDay> _cachedForecast = [];
+  DateTime? _forecastTime;
+
+  // Cache duration
+  static const Duration _cacheExpiration = Duration(minutes: 15);
 
   /// Update the location for weather data manually (disables auto device location)
   void setLocation(double lat, double lon) {
@@ -120,6 +125,32 @@ class WeatherService {
 
   /// Get when hourly trend data was last fetched
   DateTime? get hourlyDataTime => _hourlyDataTime;
+
+  /// Check if any cache is expired
+  bool get isCacheExpired {
+    final now = DateTime.now();
+    if (_latestWeatherTime != null) {
+      final age = now.difference(_latestWeatherTime!);
+      if (age >= _cacheExpiration) return true;
+    }
+    return false;
+  }
+
+  /// Manually clear all cached data (forces fresh API fetch)
+  void clearCache() {
+    _latestWeather = null;
+    _latestWeatherTime = null;
+    _hourlyTemps.clear();
+    _hourlyPrecip.clear();
+    _hourlyHumidity.clear();
+    _hourlyWind.clear();
+    _hourlySoilMoisture.clear();
+    _hourlySolarRadiation.clear();
+    _hourlyDataTime = null;
+    _cachedForecast.clear();
+    _forecastTime = null;
+    debugPrint('All weather cache cleared');
+  }
 
   /// Get device location and update coordinates
   Future<bool> _updateDeviceLocation() async {
@@ -216,11 +247,28 @@ class WeatherService {
 
   /// Fetch current weather from Open-Meteo API and broadcast
   Future<void> _fetchAndBroadcast() async {
+    // Check if cache is still valid
+    if (_latestWeather != null && _latestWeatherTime != null) {
+      final cacheAge = DateTime.now().difference(_latestWeatherTime!);
+      if (cacheAge < _cacheExpiration) {
+        debugPrint('Using cached weather data (age: ${cacheAge.inMinutes}m)');
+        if (!_nowCtl.isClosed) {
+          _nowCtl.add(_latestWeather!);
+        }
+        return;
+      } else {
+        debugPrint(
+          'Weather cache expired (age: ${cacheAge.inMinutes}m), fetching new data',
+        );
+      }
+    }
+
     try {
       debugPrint('Fetching weather for: $latitude, $longitude');
       final weather = await _fetchCurrentWeather();
       if (weather != null && !_nowCtl.isClosed) {
         _latestWeather = weather; // Cache the latest data
+        _latestWeatherTime = DateTime.now();
         debugPrint(
           'Broadcasting weather: ${weather.tempF}°F, ${weather.condition}',
         );
@@ -361,6 +409,19 @@ class WeatherService {
 
   /// Fetch hourly trend data (past 12h + next 12h)
   Future<void> _fetchHourlyTrends() async {
+    // Check if cache is still valid
+    if (_hourlyDataTime != null) {
+      final cacheAge = DateTime.now().difference(_hourlyDataTime!);
+      if (cacheAge < _cacheExpiration && _hourlyTemps.isNotEmpty) {
+        debugPrint('Using cached hourly trends (age: ${cacheAge.inMinutes}m)');
+        return;
+      } else {
+        debugPrint(
+          'Hourly trends cache expired (age: ${cacheAge.inMinutes}m), fetching new data',
+        );
+      }
+    }
+
     try {
       final now = DateTime.now();
       final startTime = now.subtract(const Duration(hours: 12));
@@ -446,6 +507,19 @@ class WeatherService {
 
   /// Fetch forecast data from Open-Meteo API
   Future<void> _fetchForecast() async {
+    // Check if cache is still valid
+    if (_forecastTime != null && _cachedForecast.isNotEmpty) {
+      final cacheAge = DateTime.now().difference(_forecastTime!);
+      if (cacheAge < _cacheExpiration) {
+        debugPrint('Using cached forecast (age: ${cacheAge.inMinutes}m)');
+        return;
+      } else {
+        debugPrint(
+          'Forecast cache expired (age: ${cacheAge.inMinutes}m), fetching new data',
+        );
+      }
+    }
+
     try {
       final url = Uri.parse(
         'https://api.open-meteo.com/v1/forecast?'
@@ -489,6 +563,7 @@ class WeatherService {
         );
       });
 
+      _forecastTime = DateTime.now();
       debugPrint('Cached ${_cachedForecast.length} days of forecast');
     } catch (e, stackTrace) {
       debugPrint('Error fetching forecast: $e');
