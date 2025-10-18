@@ -2,48 +2,55 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../services/chat_store.dart';
+import '../../services/activity_service.dart';
 import 'general_chat_page.dart';
 import 'dm_threads_page.dart';
 
-class ChatHubPage extends StatelessWidget {
+class ChatHubPage extends StatefulWidget {
   const ChatHubPage({super.key});
 
   @override
+  State<ChatHubPage> createState() => _ChatHubPageState();
+}
+
+class _ChatHubPageState extends State<ChatHubPage> with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    ActivityService.I.onChatVisited(); // track visit for achievements
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Community'),
-          actions: [
-            IconButton(
-              tooltip: 'Reset demo data',
-              icon: const FaIcon(FontAwesomeIcons.rotateLeft),
-              onPressed: () {
-                ChatStore.I.resetDemo();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chat demo reset')),
-                );
-                // Rebuild tabs by changing index briefly
-                DefaultTabController.of(context).index = 1;
-                Future.microtask(() => DefaultTabController.of(context).index = 0);
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: FaIcon(FontAwesomeIcons.earthAmericas), text: 'General'),
-              Tab(icon: FaIcon(FontAwesomeIcons.message), text: 'Messages'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
-          children: [
-            GeneralChatPage(),
-            DmThreadsPage(),
+    final scheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Community'),
+        bottom: TabBar(
+          controller: _tab,
+          indicatorColor: scheme.primary,
+          tabs: const [
+            Tab(icon: FaIcon(FontAwesomeIcons.comments), text: 'General'),
+            Tab(icon: FaIcon(FontAwesomeIcons.envelope), text: 'Direct'),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tab,
+        children: const [
+          GeneralChatPage(),
+          DmThreadsPage(),
+        ],
       ),
     );
   }
