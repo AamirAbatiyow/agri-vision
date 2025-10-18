@@ -2,11 +2,17 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-// Tabs
-import '/pages/dashboard/dashboard_page.dart';
-import '/pages/camera/camera_page.dart';
-import '/pages/chat/chat_hub_page.dart';
-import '/pages/profile/profile_page.dart';
+// DASHBOARD
+import '../dashboard/dashboard_page.dart';   // <-- your actual file/class
+
+// CAMERA (you replaced this with the Rekognition script, which exposes RekognitionTestPage)
+import '../camera/camera_page.dart';    // provides RekognitionTestPage
+
+// COMMUNITY
+import '../chat/chat_hub_page.dart';
+
+// PROFILE
+import '../profile/profile_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -15,57 +21,78 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> with RestorationMixin {
-  // Persist selected tab across app restarts (optional but nice)
-  final RestorableInt _tabIndex = RestorableInt(0);
+class _HomeShellState extends State<HomeShell> {
+  int _index = 0;
 
-  @override
-  String? get restorationId => 'home_shell';
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
-    registerForRestoration(_tabIndex, 'tab_index');
-  }
-
-  final _pages = const [
-    DashboardPage(),
-    CameraPage(),
-    ChatHubPage(),
-    ProfilePage(),
+  late final List<_TabInfo> _tabs = [
+    _TabInfo(
+      label: 'Dashboard',
+      icon: FontAwesomeIcons.gaugeHigh,
+      builder: (_) => const DashboardPage(),     // <-- use your DashboardPage
+    ),
+    _TabInfo(
+      label: 'Camera',
+      icon: FontAwesomeIcons.camera,
+      builder: (_) => const RekognitionTestPage(), // <-- from camera_page.dart
+    ),
+    _TabInfo(
+      label: 'Community',
+      icon: FontAwesomeIcons.comments,
+      builder: (_) => const ChatHubPage(),
+    ),
+    _TabInfo(
+      label: 'Profile',
+      icon: FontAwesomeIcons.user,
+      builder: (_) => const ProfilePage(),
+    ),
   ];
 
   @override
-  void dispose() {
-    _tabIndex.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: _pages[_tabIndex.value],
+      body: IndexedStack(
+        index: _index,
+        children: _tabs.map((t) => _KeepAlive(child: t.builder(context))).toList(),
+      ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex.value,
-        onDestinationSelected: (i) => setState(() => _tabIndex.value = i),
-        destinations: const [
-          NavigationDestination(
-            icon: FaIcon(FontAwesomeIcons.seedling),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: FaIcon(FontAwesomeIcons.camera),
-            label: 'Camera',
-          ),
-          NavigationDestination(
-            icon: FaIcon(FontAwesomeIcons.comments),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: FaIcon(FontAwesomeIcons.user),
-            label: 'Profile',
-          ),
-        ],
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        indicatorColor: scheme.primaryContainer,
+        destinations: _tabs
+            .map(
+              (t) => NavigationDestination(
+                icon: FaIcon(t.icon, size: 18),
+                label: t.label,
+              ),
+            )
+            .toList(),
       ),
     );
+  }
+}
+
+class _TabInfo {
+  final String label;
+  final IconData icon;
+  final WidgetBuilder builder;
+  _TabInfo({required this.label, required this.icon, required this.builder});
+}
+
+class _KeepAlive extends StatefulWidget {
+  final Widget child;
+  const _KeepAlive({required this.child, super.key});
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
