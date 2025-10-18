@@ -11,8 +11,8 @@ class Config:
     AWS_REGION = os.getenv('AWS_REGION')
     
     CUSTOM_LABEL_MODEL_ARN = os.getenv('CUSTOM_LABEL_MODEL_ARN')
-    CUSTOM_MIN_CONFIDENCE = float(os.getenv('CUSTOM_MIN_CONFIDENCE'))
-    MAX_CUSTOM_LABELS = int(os.getenv('MAX_CUSTOM_LABELS'))
+    CUSTOM_MIN_CONFIDENCE = float(os.getenv('CUSTOM_MIN_CONFIDENCE','0.6'))
+    MAX_CUSTOM_LABELS = int(os.getenv('MAX_CUSTOM_LABELS','5'))
 
     MONGO_URI = "mongodb+srv://mongodb:mongopassword@cluster0.0fcuzdh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     DB_NAME = "learn_linux"
