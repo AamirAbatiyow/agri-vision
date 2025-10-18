@@ -6,6 +6,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../services/activity_service.dart';
+// NEW: import your standalone page (we won’t modify it)
+import '../../experiments/rekognition_test_standalone.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -70,6 +72,16 @@ class _CameraPageState extends State<CameraPage> {
             tooltip: 'Pick from gallery',
             icon: const FaIcon(FontAwesomeIcons.images),
             onPressed: _busy ? null : _pickFromGallery,
+          ),
+          // NEW: quick entry to your Rekognition test page
+          IconButton(
+            tooltip: 'AWS Rekognition Lab',
+            icon: const FaIcon(FontAwesomeIcons.cloud),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const RekognitionTestPage()),
+              );
+            },
           ),
         ],
       ),
