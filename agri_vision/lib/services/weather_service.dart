@@ -167,12 +167,19 @@ class WeatherService {
   /// Fetch current weather from Open-Meteo API and broadcast
   Future<void> _fetchAndBroadcast() async {
     try {
+      debugPrint('Fetching weather for: $latitude, $longitude');
       final weather = await _fetchCurrentWeather();
       if (weather != null && !_nowCtl.isClosed) {
+        debugPrint(
+          'Broadcasting weather: ${weather.tempF}°F, ${weather.condition}',
+        );
         _nowCtl.add(weather);
+      } else {
+        debugPrint('Weather data is null, not broadcasting');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error fetching weather: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 
@@ -190,13 +197,16 @@ class WeatherService {
         '&timezone=auto',
       );
 
+      debugPrint('Calling API: $url');
       final response = await http.get(url);
+      debugPrint('API Response status: ${response.statusCode}');
 
       if (response.statusCode != 200) {
-        debugPrint('API Error: ${response.statusCode}');
+        debugPrint('API Error: ${response.statusCode} - ${response.body}');
         return null;
       }
 
+      debugPrint('API Response body: ${response.body.substring(0, 200)}...');
       final data = json.decode(response.body);
       final current = data['current'];
 
