@@ -287,6 +287,12 @@ def threads(username):
     threads = [{"peer": r["_id"], "lastTs": r["lastTs"]} for r in result]
     return jsonify(threads)
 
+@app.route("/ai_usda", methods=["GET"])
+def ai_usda():
+    from agent_usda import run_usda_query
+    query = request.args.get("query", "")
+    result = run_usda_query(query)
+    return jsonify({"response": result})
 
 # ---------------------------
 # Run server
