@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/sensor_service.dart';
 import '../../services/weather_service.dart';
+import '../../services/activity_service.dart';
 
 /// --- Dashboard page with metric cards + tiny charts ---
 
@@ -17,7 +18,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final Stream<SensorSnapshot> _sensor$;
   late final Stream<WeatherNow> _weather$;
-  List<WeatherDay> _forecast = [];
+  late List<WeatherDay> _forecast;
 
   // rolling history for sparklines
   final List<double> tempHistory = [];
@@ -32,17 +33,8 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _sensor$ = SensorService.I.start();
     _weather$ = WeatherService.I.start();
-    _loadForecast();
-  }
-
-  Future<void> _loadForecast() async {
-    // Wait a moment for the initial forecast fetch to complete
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) {
-      setState(() {
-        _forecast = WeatherService.I.forecast();
-      });
-    }
+    _forecast = WeatherService.I.forecast();
+    ActivityService.I.onDashboardViewed();
   }
 
   @override
@@ -71,6 +63,9 @@ class _DashboardPageState extends State<DashboardPage> {
           }
 
           final s = sensorSnap.data!;
+          ActivityService.I.onSensorTick();
+
+          _push(tempHistory, s.temperatureF);
           _push(precipHistory, s.precipitation);
           _push(moistHistory, s.soilMoisture);
           _push(humidHistory, s.humidity);

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../services/activity_service.dart';
+
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
 
@@ -195,7 +197,6 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   }
 
   Future<void> _runAnalysis() async {
-    // Simple on-device mock: infer some scores based on file size / name hash
     try {
       final name = widget.file.name;
       final bytes = await widget.file.length();
@@ -213,6 +214,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
           'Disease Risk': disease,
         };
       });
+
+      // count analysis for achievements
+      ActivityService.I.onPhotoAnalyzed();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Analysis failed: $e')));
@@ -272,9 +276,7 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       floatingActionButton: FloatingActionButton.extended(
         icon: const FaIcon(FontAwesomeIcons.download),
         label: const Text('Save (system)'),
-        onPressed: () async {
-          // image_picker already saves camera captures to a temp file.
-          // For demo, we just show a confirmation.
+        onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to device (or available via share).')));
         },
       ),
