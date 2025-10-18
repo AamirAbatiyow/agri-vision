@@ -76,12 +76,16 @@ class _DashboardPageState extends State<DashboardPage> {
         builder: (context, sensorSnap) {
           final scheme = Theme.of(context).colorScheme;
 
-          if (!sensorSnap.hasData) {
+          // Only show loading if we don't have cached weather data
+          // This allows instant display when revisiting the dashboard
+          if (!sensorSnap.hasData && WeatherService.I.latestWeather == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
           // Sensor data is still used for activity tracking
-          ActivityService.I.onSensorTick();
+          if (sensorSnap.hasData) {
+            ActivityService.I.onSensorTick();
+          }
 
           return StreamBuilder<WeatherNow>(
             stream: _weather$,
@@ -300,6 +304,10 @@ class _WeatherNowCard extends StatelessWidget {
     final humid = now == null ? '—' : '${now!.humidity.toStringAsFixed(0)}%';
     final precip = now == null ? '—' : '${now!.precipProb.toStringAsFixed(0)}%';
     final wind = now == null ? '—' : '${now!.windMph.toStringAsFixed(0)} mph';
+    final soil = now == null ? '—' : '${now!.soilMoisture.toStringAsFixed(0)}%';
+    final sun = now == null
+        ? '—'
+        : '${now!.solarRadiation.toStringAsFixed(0)} kLux';
 
     return Container(
       decoration: BoxDecoration(
@@ -333,12 +341,17 @@ class _WeatherNowCard extends StatelessWidget {
                       icon: FontAwesomeIcons.fireFlameCurved,
                       text: 'Feels $feels',
                     ),
-                    _ChipText(icon: FontAwesomeIcons.water, text: 'Hum $humid'),
                     _ChipText(
                       icon: FontAwesomeIcons.cloudRain,
                       text: 'Precip $precip',
                     ),
+                    _ChipText(
+                      icon: FontAwesomeIcons.droplet,
+                      text: 'Soil $soil',
+                    ),
+                    _ChipText(icon: FontAwesomeIcons.water, text: 'Hum $humid'),
                     _ChipText(icon: FontAwesomeIcons.wind, text: 'Wind $wind'),
+                    _ChipText(icon: FontAwesomeIcons.sun, text: 'Sun $sun'),
                   ],
                 ),
               ],
