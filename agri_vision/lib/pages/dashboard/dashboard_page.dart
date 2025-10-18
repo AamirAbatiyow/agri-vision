@@ -17,7 +17,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final Stream<SensorSnapshot> _sensor$;
   late final Stream<WeatherNow> _weather$;
-  late List<WeatherDay> _forecast;
+  List<WeatherDay> _forecast = [];
 
   // rolling history for sparklines
   final List<double> tempHistory = [];
@@ -32,7 +32,17 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _sensor$ = SensorService.I.start();
     _weather$ = WeatherService.I.start();
-    _forecast = WeatherService.I.forecast();
+    _loadForecast();
+  }
+
+  Future<void> _loadForecast() async {
+    // Wait a moment for the initial forecast fetch to complete
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {
+        _forecast = WeatherService.I.forecast();
+      });
+    }
   }
 
   @override

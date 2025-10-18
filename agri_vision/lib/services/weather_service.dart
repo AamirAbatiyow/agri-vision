@@ -1,16 +1,19 @@
 // lib/services/weather_service.dart
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 /// Current conditions model.
 class WeatherNow {
   final DateTime ts;
-  final double tempF;       // current temp
-  final double feelsLikeF;  // "feels like"
-  final double humidity;    // %
-  final double precipProb;  // %
-  final double windMph;     // mph
-  final String condition;   // e.g., 'Sunny', 'Cloudy', 'Rain'
+  final double tempF; // current temp
+  final double feelsLikeF; // "feels like"
+  final double humidity; // %
+  final double precipProb; // %
+  final double windMph; // mph
+  final String condition; // e.g., 'Sunny', 'Cloudy', 'Rain'
 
   const WeatherNow({
     required this.ts,
@@ -40,53 +43,110 @@ class WeatherDay {
   });
 }
 
-/// Simple, demo-friendly weather service.
-/// - No HTTP; values are procedurally generated.
-/// - Swap internals later with a real client while keeping the same API.
+/// Weather service using Open-Meteo API.
+/// Provides real-time weather data and forecasts.
 class WeatherService {
   WeatherService._();
   static final WeatherService I = WeatherService._();
 
-  final _rng = Random();
   final _nowCtl = StreamController<WeatherNow>.broadcast();
   Timer? _timer;
 
-  /// Begin streaming "live" weather snapshots (demo).
+  // Default location (can be configured)
+  // Using coordinates for central Iowa as an example agricultural location
+  double latitude = 41.8780;
+  double longitude = -93.0977;
+
+  List<WeatherDay> _cachedForecast = [];
+
+  /// Update the location for weather data
+  void setLocation(double lat, double lon) {
+    latitude = lat;
+    longitude = lon;
+  }
+
+  /// Begin streaming "live" weather snapshots from Open-Meteo API.
   /// Call [stop] to halt; call [dispose] to close permanently.
-  Stream<WeatherNow> start({Duration period = const Duration(seconds: 5)}) {
+  Stream<WeatherNow> start({Duration period = const Duration(minutes: 5)}) {
     _timer?.cancel();
 
-    // Seed base values around a mild day.
-    double temp = 72;
-    double humid = 55;
-    double wind = 7;
-    double precip = 10;
+    // Fetch immediately on start (both current weather and forecast)
+    _fetchAndBroadcast();
+    _fetchForecast();
 
+    // Then fetch periodically
     _timer = Timer.periodic(period, (_) {
-      // Gentle wiggle; slight evening cooling heuristic.
-      final h = DateTime.now().hour;
-      final diurnal = (h >= 18 || h <= 7) ? -0.3 : 0.2;
-
-      temp = _clamp(temp + diurnal + _noise(1.2), 55, 95);
-      humid = _clamp(humid + _noise(2.0), 25, 95);
-      wind = _clamp(wind + _noise(1.5), 0, 25);
-      precip = _clamp(precip + _noise(4.0) + (h >= 17 ? 1.5 : -0.8), 0, 100);
-
-      final cond = _pickCondition(temp, humid, precip);
-      final feels = _computeFeelsLike(temp, humid, wind);
-
-      _nowCtl.add(WeatherNow(
-        ts: DateTime.now(),
-        tempF: temp,
-        feelsLikeF: feels,
-        humidity: humid,
-        precipProb: precip,
-        windMph: wind,
-        condition: cond,
-      ));
+      _fetchAndBroadcast();
+      _fetchForecast();
     });
 
     return _nowCtl.stream;
+  }
+
+  /// Fetch current weather from Open-Meteo API and broadcast
+  Future<void> _fetchAndBroadcast() async {
+    try {
+      final weather = await _fetchCurrentWeather();
+      if (weather != null && !_nowCtl.isClosed) {
+        _nowCtl.add(weather);
+      }
+    } catch (e) {
+      debugPrint('Error fetching weather: $e');
+    }
+  }
+
+  /// Fetch current weather data from Open-Meteo API
+  Future<WeatherNow?> _fetchCurrentWeather() async {
+    try {
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?'
+        'latitude=$latitude&longitude=$longitude'
+        '&current=temperature_2m,relative_humidity_2m,apparent_temperature,'
+        'precipitation,weather_code,wind_speed_10m'
+        '&temperature_unit=fahrenheit'
+        '&wind_speed_unit=mph'
+        '&precipitation_unit=inch'
+        '&timezone=auto',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode != 200) {
+        debugPrint('API Error: ${response.statusCode}');
+        return null;
+      }
+
+      final data = json.decode(response.body);
+      final current = data['current'];
+
+      final tempF = (current['temperature_2m'] ?? 72.0).toDouble();
+      final feelsLikeF = (current['apparent_temperature'] ?? tempF).toDouble();
+      final humidity = (current['relative_humidity_2m'] ?? 50.0).toDouble();
+      final windMph = (current['wind_speed_10m'] ?? 5.0).toDouble();
+      final weatherCode = current['weather_code'] ?? 0;
+
+      // Open-Meteo doesn't provide direct precipitation probability for current
+      // We'll use precipitation amount as a proxy (0 = 0%, >0 = some percentage)
+      final precipAmount = (current['precipitation'] ?? 0.0).toDouble();
+      final precipProb = precipAmount > 0
+          ? min(precipAmount * 30 + 20, 100.0)
+          : 0.0;
+
+      final condition = _weatherCodeToCondition(weatherCode);
+
+      return WeatherNow(
+        ts: DateTime.now(),
+        tempF: tempF,
+        feelsLikeF: feelsLikeF,
+        humidity: humidity,
+        precipProb: precipProb,
+        windMph: windMph,
+        condition: condition,
+      );
+    } catch (e) {
+      debugPrint('Error parsing weather data: $e');
+      return null;
+    }
   }
 
   /// Stop emitting updates (stream remains open).
@@ -101,48 +161,105 @@ class WeatherService {
     _nowCtl.close();
   }
 
-  /// Generate a 5-day forecast (mock).
+  /// Fetch 5-day forecast from Open-Meteo API
   List<WeatherDay> forecast() {
-    final now = DateTime.now();
-    final baseHigh = 74 + _rng.nextInt(7); // 74–80
-    final baseLow = 58 + _rng.nextInt(6);  // 58–63
+    // Return cached forecast immediately, but also fetch new data
+    _fetchForecast();
+    return _cachedForecast;
+  }
 
-    return List.generate(5, (i) {
-      final day = now.add(Duration(days: i));
-      final high = (baseHigh + _noise(3)).clamp(60, 95).toDouble();
-      final low = (baseLow + _noise(3)).clamp(45, high - 2).toDouble();
-      final precip = _clamp(15 + _noise(20) + (i == 2 ? 20 : 0), 0, 100);
-      final cond = _pickCondition((high + low) / 2, 55 + _noise(10), precip);
-      return WeatherDay(
-        day: DateTime(day.year, day.month, day.day),
-        highF: high,
-        lowF: low,
-        precipProb: precip,
-        condition: cond,
+  /// Fetch forecast data from Open-Meteo API
+  Future<void> _fetchForecast() async {
+    try {
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?'
+        'latitude=$latitude&longitude=$longitude'
+        '&daily=temperature_2m_max,temperature_2m_min,'
+        'precipitation_probability_max,weather_code'
+        '&temperature_unit=fahrenheit'
+        '&timezone=auto'
+        '&forecast_days=5',
       );
-    });
+
+      final response = await http.get(url);
+
+      if (response.statusCode != 200) {
+        debugPrint('Forecast API Error: ${response.statusCode}');
+        return;
+      }
+
+      final data = json.decode(response.body);
+      final daily = data['daily'];
+
+      final times = (daily['time'] as List);
+      final maxTemps = (daily['temperature_2m_max'] as List);
+      final minTemps = (daily['temperature_2m_min'] as List);
+      final precipProbs = (daily['precipitation_probability_max'] as List);
+      final weatherCodes = (daily['weather_code'] as List);
+
+      _cachedForecast = List.generate(min(5, times.length), (i) {
+        return WeatherDay(
+          day: DateTime.parse(times[i]),
+          highF: (maxTemps[i] ?? 75.0).toDouble(),
+          lowF: (minTemps[i] ?? 55.0).toDouble(),
+          precipProb: (precipProbs[i] ?? 0.0).toDouble(),
+          condition: _weatherCodeToCondition(weatherCodes[i] ?? 0),
+        );
+      });
+    } catch (e) {
+      debugPrint('Error fetching forecast: $e');
+    }
   }
 
   // ----------------- Helpers -----------------
 
-  String _pickCondition(double tempF, double humidity, double precipProb) {
-    if (precipProb > 60) {
-      return humidity > 70 ? 'Rain' : 'Showers';
+  /// Convert WMO weather code to human-readable condition
+  /// Reference: https://open-meteo.com/en/docs
+  String _weatherCodeToCondition(int code) {
+    switch (code) {
+      case 0:
+        return 'Clear';
+      case 1:
+      case 2:
+        return 'Partly Cloudy';
+      case 3:
+        return 'Cloudy';
+      case 45:
+      case 48:
+        return 'Fog';
+      case 51:
+      case 53:
+      case 55:
+        return 'Drizzle';
+      case 61:
+      case 63:
+      case 65:
+        return 'Rain';
+      case 66:
+      case 67:
+        return 'Freezing Rain';
+      case 71:
+      case 73:
+      case 75:
+        return 'Snow';
+      case 77:
+        return 'Snow Grains';
+      case 80:
+      case 81:
+      case 82:
+        return 'Showers';
+      case 85:
+      case 86:
+        return 'Snow Showers';
+      case 95:
+        return 'Thunderstorm';
+      case 96:
+      case 99:
+        return 'Thunderstorm with Hail';
+      default:
+        return 'Partly Cloudy';
     }
-    if (humidity > 75 && tempF < 65) return 'Fog';
-    if (humidity < 35 && tempF > 85) return 'Hot & Dry';
-    if (humidity < 35 && tempF < 60) return 'Clear';
-    if (humidity > 65 && tempF < 60) return 'Cloudy';
-    return 'Partly Cloudy';
   }
-
-  double _computeFeelsLike(double t, double h, double w) {
-    // Very rough "feels like": humidity increases heat, wind cools slightly.
-    return _clamp(t + (h - 50) * 0.06 - min(w, 15) * 0.1, 40, 110);
-  }
-
-  double _noise(double scale) => (_rng.nextDouble() - 0.5) * 2 * scale;
-  double _clamp(double v, double lo, double hi) => v.clamp(lo, hi).toDouble();
 }
 
 /// Optional: tiny view model mappers (icons/labels can be used by UI).
@@ -151,7 +268,17 @@ class WeatherView {
     switch (condition) {
       case 'Rain':
       case 'Showers':
+      case 'Freezing Rain':
         return '🌧️';
+      case 'Drizzle':
+        return '🌦️';
+      case 'Snow':
+      case 'Snow Showers':
+      case 'Snow Grains':
+        return '❄️';
+      case 'Thunderstorm':
+      case 'Thunderstorm with Hail':
+        return '⛈️';
       case 'Fog':
         return '🌫️';
       case 'Hot & Dry':
@@ -159,7 +286,12 @@ class WeatherView {
       case 'Cloudy':
         return '☁️';
       case 'Clear':
-        return '🌙';
+        // Use sun during day, moon at night
+        final hour = DateTime.now().hour;
+        return (hour >= 6 && hour < 20) ? '☀️' : '🌙';
+      case 'Partly Cloudy':
+        final hour = DateTime.now().hour;
+        return (hour >= 6 && hour < 20) ? '⛅' : '🌙';
       default:
         return '⛅';
     }
