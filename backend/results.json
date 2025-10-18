@@ -1,10 +1,10 @@
 {
-  "timestamp": "2025-10-18T07:03:39.739138",
-  "filename": "scaled_75766fcd-d2c2-488a-9d7b-b8b93af98349857581822754529412.jpg",
+  "timestamp": "2025-10-18T07:09:46.036357",
+  "filename": "scaled_39479d0f-9c42-4555-8004-181b1fbd8c2b601957224398944964.jpg",
   "labels": [
     {
-      "name": "Corn_(maize)___healthy",
-      "confidence": 99.99
+      "name": "Potato___Late_blight",
+      "confidence": 93.82
     }
   ]
 }
