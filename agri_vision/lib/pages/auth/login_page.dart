@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../../services/chat_store.dart'; // UserSession
 import '../../services/user_prefs.dart'; // for onboarding (if we create account here)
+import '../../services/activity_service.dart';
 import '../shell/home_shell.dart';
 
 class LoginPage extends StatefulWidget {
@@ -57,6 +58,10 @@ class _LoginPageState extends State<LoginPage> {
         if (data['success'] == true) {
           // Success: username == display name in AgriVision
           UserSession.set(user: username, name: username);
+
+          // Set last active time on login
+          ActivityService.I.lastActive = DateTime.now();
+
           if (!mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const HomeShell()),
@@ -83,6 +88,10 @@ class _LoginPageState extends State<LoginPage> {
           if (signRes.statusCode == 201) {
             // Mimic signup flow: set session, run onboarding sheet once, then go home
             UserSession.set(user: username, name: username);
+
+            // Set last active time on account creation
+            ActivityService.I.lastActive = DateTime.now();
+
             final ok = await _showOnboardingSheet();
             if (ok == true && mounted) {
               Navigator.of(context).pushAndRemoveUntil(
@@ -269,6 +278,10 @@ class _LoginPageState extends State<LoginPage> {
 
   void _guest() {
     UserSession.set(user: 'guest', name: 'guest');
+
+    // Set last active time for guest login
+    ActivityService.I.lastActive = DateTime.now();
+
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeShell()),
       (route) => false,

@@ -3,12 +3,12 @@ class ActivityService {
   ActivityService._();
   static final ActivityService I = ActivityService._();
 
-  int dashboardViews = 0;     // times the dashboard page was shown
-  int sensorTicks = 0;        // sensor snapshots processed
-  int photoAnalyses = 0;      // times "Analyze" ran in camera viewer
-  int generalMessages = 0;    // general chat messages sent
-  int dmMessages = 0;         // DM messages sent
-  DateTime? lastActive;       // last activity timestamp
+  int dashboardViews = 0; // times the dashboard page was shown
+  int sensorTicks = 0; // sensor snapshots processed
+  int photoAnalyses = 0; // times "Analyze" ran in camera viewer
+  int generalMessages = 0; // general chat messages sent
+  int dmMessages = 0; // DM messages sent
+  DateTime? lastActive; // last activity timestamp
   bool visitedAllTabs = false;
 
   // tab visit flags (to award "Pioneer")

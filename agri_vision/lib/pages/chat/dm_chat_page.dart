@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/chat_store.dart';
+import '../../services/activity_service.dart';
 
 class DmChatPage extends StatefulWidget {
   final String peerUsername; // who you're chatting with
@@ -42,6 +43,9 @@ class _DmChatPageState extends State<DmChatPage> {
     await ChatStore.I.postDm(widget.peerUsername, text);
     _input.clear();
     _scrollToEndSafe();
+
+    // Track DM sent and update last active
+    ActivityService.I.onMessageSent(isDm: true);
   }
 
   void _scrollToEndSafe() {

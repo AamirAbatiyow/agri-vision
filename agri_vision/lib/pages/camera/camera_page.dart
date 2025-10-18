@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../../services/activity_service.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -114,6 +116,9 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
           _labels = jsonResponse['labels'] ?? [];
           _errorMessage = null;
         });
+
+        // Track successful analysis
+        ActivityService.I.onPhotoAnalyzed();
       } else {
         setState(() {
           _errorMessage =
@@ -146,6 +151,9 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
         setState(() {
           _customLabels = jsonResponse['results'] ?? jsonResponse;
         });
+
+        // Track successful AI analysis
+        ActivityService.I.onPhotoAnalyzed();
       } else {
         setState(() {
           _errorMessage =

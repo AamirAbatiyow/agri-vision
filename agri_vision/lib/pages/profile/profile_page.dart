@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../services/chat_store.dart';
 import '../../services/user_prefs.dart';
 import '../../services/activity_service.dart';
 import '../auth/auth_gate.dart';
@@ -25,7 +26,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     ActivityService.I.onProfileVisited();
-    
+
     // Auto-refresh stats every few seconds while on this page
     _startAutoRefresh();
   }
@@ -34,7 +35,8 @@ class _ProfilePageState extends State<ProfilePage> {
     Future.doWhile(() async {
       if (!mounted) return false;
       await Future.delayed(const Duration(seconds: 2));
-      if (mounted) setState(() {}); // Trigger rebuild to show latest ActivityService data
+      if (mounted)
+        setState(() {}); // Trigger rebuild to show latest ActivityService data
       return mounted;
     });
   }
@@ -142,14 +144,12 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    
+
     // Get live stats from ActivityService
     final stats = ActivityService.I;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-      ),
+      appBar: AppBar(title: const Text('Profile')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -232,25 +232,25 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Row(
                     children: [
                       _Stat(
-                        label: 'General Sent',
-                        value: '$_generalSent',
+                        label: 'Messages',
+                        value: '${stats.generalMessages}',
                         icon: FontAwesomeIcons.earthAmericas,
                       ),
                       _Stat(
-                        label: 'DMs Sent',
-                        value: '$_dmSent',
+                        label: 'Direct',
+                        value: '${stats.dmMessages}',
                         icon: FontAwesomeIcons.message,
                       ),
                       _Stat(
                         label: 'Analyses',
-                        value: '$_analyses',
+                        value: '${stats.photoAnalyses}',
                         icon: FontAwesomeIcons.magnifyingGlassChart,
                       ),
                       _Stat(
                         label: 'Last Active',
-                        value: _lastActive == null
+                        value: stats.lastActive == null
                             ? '—'
-                            : _fmtTime(_lastActive!),
+                            : _fmtTime(stats.lastActive!),
                         icon: FontAwesomeIcons.clock,
                       ),
                     ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/chat_store.dart';
+import '../../services/activity_service.dart';
 import 'dm_chat_page.dart';
 
 class GeneralChatPage extends StatefulWidget {
@@ -42,6 +43,9 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
     await ChatStore.I.postGeneral(text); // optimistic append inside store
     _input.clear();
     _scrollToEndSafe();
+
+    // Track message sent and update last active
+    ActivityService.I.onMessageSent(isDm: false);
   }
 
   void _scrollToEndSafe() {

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../../services/chat_store.dart'; // UserSession
 import '../../services/user_prefs.dart'; // onboarding storage (farmType/region)
+import '../../services/activity_service.dart';
 import '../shell/home_shell.dart';
 
 class SignupPage extends StatefulWidget {
@@ -58,6 +59,9 @@ class _SignupPageState extends State<SignupPage> {
       if (res.statusCode == 201) {
         // Set local session (username == display name)
         UserSession.set(user: username, name: username);
+
+        // Set last active time on signup
+        ActivityService.I.lastActive = DateTime.now();
 
         // Collect onboarding (Farm Type + Region) locally
         final ok = await _showOnboardingSheet();

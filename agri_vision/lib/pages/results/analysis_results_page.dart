@@ -70,7 +70,8 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Failed to fetch results: $e\n\nMake sure the backend server is running on $backendUrl';
+          _error =
+              'Failed to fetch results: $e\n\nMake sure the backend server is running on $backendUrl';
         });
       }
     }
@@ -155,78 +156,78 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
                 ),
               )
             : _error != null
-                ? _ErrorBox(msg: _error!)
-                : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _Card(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'AI Diagnosis',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
+            ? _ErrorBox(msg: _error!)
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'AI Diagnosis',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        _KV('Disease', disease),
-                        _KV('Cause', cause),
-                        _KV('Symptoms', symptoms),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Top Treatments',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 6),
-                        if (treatments.isEmpty)
-                          Text(
-                            'No treatments available',
-                            style: TextStyle(color: scheme.onSurfaceVariant),
-                          )
-                        else
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: treatments
-                                .map((t) => _Chip(text: t))
-                                .toList(),
+                          const SizedBox(height: 8),
+                          _KV('Disease', disease),
+                          _KV('Cause', cause),
+                          _KV('Symptoms', symptoms),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Top Treatments',
+                            style: TextStyle(fontWeight: FontWeight.w800),
                           ),
-                      ],
+                          const SizedBox(height: 6),
+                          if (treatments.isEmpty)
+                            Text(
+                              'No treatments available',
+                              style: TextStyle(color: scheme.onSurfaceVariant),
+                            )
+                          else
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: treatments
+                                  .map((t) => _Chip(text: t))
+                                  .toList(),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                _Card(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Standard Labels',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                  const SizedBox(height: 12),
+                  _Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Standard Labels',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (_labels.isEmpty)
-                          Text(
-                            'No labels detected with confidence > 70%',
-                            style: TextStyle(color: scheme.onSurfaceVariant),
-                          ),
-                        for (int i = 0; i < _labels.length; i++)
-                          _LabelRow(index: i + 1, data: _labels[i]),
-                      ],
+                          const SizedBox(height: 8),
+                          if (_labels.isEmpty)
+                            Text(
+                              'No labels detected with confidence > 70%',
+                              style: TextStyle(color: scheme.onSurfaceVariant),
+                            ),
+                          for (int i = 0; i < _labels.length; i++)
+                            _LabelRow(index: i + 1, data: _labels[i]),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                  ],
-                ),
+                ],
+              ),
       ),
     );
   }
