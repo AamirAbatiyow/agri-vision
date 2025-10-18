@@ -1,10 +1,10 @@
 {
     "disease": "Corn (maize) - Healthy",
     "cause": "No disease present",
-    "symptoms": "Normal green leaves, robust stalks, and well-formed ears",
+    "symptoms": "Uniform green color, vigorous growth, absence of spots or lesions",
     "treatment": [
-        "Maintain proper fertilization",
-        "Ensure adequate irrigation",
-        "Practice regular crop monitoring"
+        "Maintain proper irrigation schedule",
+        "Apply balanced fertilization",
+        "Implement integrated pest management"
     ]
 }
