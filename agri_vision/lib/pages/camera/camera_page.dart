@@ -162,6 +162,7 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final safeCustomLabels = customLabelsSafe;
     final treatmentList = <String>[];
     final rawTreatments = safeCustomLabels['treatment'];
@@ -173,7 +174,7 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('AWS Rekognition Test'),
+        title: const Text('Crop Disease Analyzer'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -199,7 +200,7 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
               label: const Text('Fetch AI Strands Results'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+                foregroundColor: scheme.primaryContainer,
                 padding: const EdgeInsets.all(16),
                 textStyle: const TextStyle(fontSize: 18),
               ),
@@ -237,7 +238,7 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: scheme.primaryContainer,
                   border: Border.all(color: Colors.red),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -257,9 +258,9 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
+                  color: scheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.purple.shade200),
+                  border: Border.all(color: scheme.primaryContainer),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,9 +314,9 @@ class _RekognitionTestPageState extends State<RekognitionTestPage> {
               const SizedBox(height: 10),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: scheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: scheme.primaryContainer),
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
