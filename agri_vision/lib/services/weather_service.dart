@@ -15,6 +15,10 @@ class WeatherNow {
   final double precipProb; // %
   final double windMph; // mph
   final String condition; // e.g., 'Sunny', 'Cloudy', 'Rain'
+  final double soilMoisture; // soil moisture 0-7cm depth (%)
+  final double solarRadiation; // solar radiation (kLux approximation)
+  final bool hasSoilData; // true if real soil data available
+  final bool hasSolarData; // true if real solar data available
 
   const WeatherNow({
     required this.ts,
@@ -24,6 +28,10 @@ class WeatherNow {
     required this.precipProb,
     required this.windMph,
     required this.condition,
+    required this.soilMoisture,
+    required this.solarRadiation,
+    this.hasSoilData = true,
+    this.hasSolarData = true,
   });
 }
 
@@ -209,7 +217,8 @@ class WeatherService {
         'https://api.open-meteo.com/v1/forecast?'
         'latitude=$latitude&longitude=$longitude'
         '&current=temperature_2m,relative_humidity_2m,apparent_temperature,'
-        'precipitation,weather_code,wind_speed_10m'
+        'precipitation,weather_code,wind_speed_10m,'
+        'soil_moisture_0_to_7cm,shortwave_radiation'
         '&temperature_unit=fahrenheit'
         '&wind_speed_unit=mph'
         '&precipitation_unit=inch'
@@ -225,9 +234,15 @@ class WeatherService {
         return null;
       }
 
-      debugPrint('API Response body: ${response.body.substring(0, 200)}...');
-      final data = json.decode(response.body);
+      final responseBody = response.body;
+      debugPrint(
+        'API Response body: ${responseBody.substring(0, min(responseBody.length, 300))}...',
+      );
+      final data = json.decode(responseBody);
       final current = data['current'];
+
+      // Debug: Check what fields are available
+      debugPrint('Available fields: ${current.keys.toList()}');
 
       final tempF = (current['temperature_2m'] ?? 72.0).toDouble();
       final feelsLikeF = (current['apparent_temperature'] ?? tempF).toDouble();
@@ -242,6 +257,44 @@ class WeatherService {
           ? min(precipAmount * 30 + 20, 100.0)
           : 0.0;
 
+      // Soil moisture (m³/m³) - convert to percentage (0-100%)
+      // Note: Not all locations have soil moisture data available
+      final soilMoistureValue = current['soil_moisture_0_to_7cm'];
+      debugPrint('Soil moisture raw value: $soilMoistureValue');
+
+      double soilMoisture;
+      bool hasSoilData = soilMoistureValue != null;
+
+      if (soilMoistureValue != null) {
+        // Typical range is 0.0 to 0.5 m³/m³, we'll scale to 0-100%
+        final soilMoistureRaw = soilMoistureValue.toDouble();
+        soilMoisture = (soilMoistureRaw * 200).clamp(0.0, 100.0);
+      } else {
+        // If soil moisture not available, use humidity as a rough proxy
+        // This is just a demo fallback - real soil moisture requires sensors
+        debugPrint(
+          'Soil moisture not available, using humidity-based estimate',
+        );
+        soilMoisture = (humidity * 0.6).clamp(20.0, 80.0);
+      }
+
+      // Solar radiation (W/m²) - convert to kLux approximation
+      final solarRadiationValue = current['shortwave_radiation'];
+      debugPrint('Solar radiation raw value: $solarRadiationValue');
+
+      double solarRadiation;
+      bool hasSolarData = solarRadiationValue != null;
+
+      if (solarRadiationValue != null) {
+        // Rough conversion: 1 W/m² ≈ 0.0079 klux (for solar spectrum)
+        // Typical full sun is ~1000 W/m² ≈ 120 klux, we'll scale for display
+        final solarRadiationRaw = solarRadiationValue.toDouble();
+        solarRadiation = (solarRadiationRaw * 0.065).clamp(0.0, 120.0);
+      } else {
+        debugPrint('Solar radiation not available, returning 0');
+        solarRadiation = 0.0;
+      }
+
       final condition = _weatherCodeToCondition(weatherCode);
 
       return WeatherNow(
@@ -252,6 +305,10 @@ class WeatherService {
         precipProb: precipProb,
         windMph: windMph,
         condition: condition,
+        soilMoisture: soilMoisture,
+        solarRadiation: solarRadiation,
+        hasSoilData: hasSoilData,
+        hasSolarData: hasSolarData,
       );
     } catch (e) {
       debugPrint('Error parsing weather data: $e');

@@ -20,13 +20,13 @@ class _DashboardPageState extends State<DashboardPage> {
   late final Stream<WeatherNow> _weather$;
   late List<WeatherDay> _forecast;
 
-  // rolling history for sparklines
+  // rolling history for sparklines (all from weather API)
   final List<double> tempHistory = [];
-  final List<double> precipHistory = []; // from weather API
-  final List<double> moistHistory = [];
-  final List<double> humidHistory = []; // from weather API
-  final List<double> windHistory = []; // from weather API
-  final List<double> sunHistory = [];
+  final List<double> precipHistory = [];
+  final List<double> moistHistory = []; // soil moisture from API
+  final List<double> humidHistory = [];
+  final List<double> windHistory = [];
+  final List<double> sunHistory = []; // solar radiation from API
 
   @override
   void initState() {
@@ -62,12 +62,8 @@ class _DashboardPageState extends State<DashboardPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final s = sensorSnap.data!;
+          // Sensor data is still used for activity tracking
           ActivityService.I.onSensorTick();
-
-          // Only keep soil moisture and sunlight from sensors
-          _push(moistHistory, s.soilMoisture);
-          _push(sunHistory, s.sunlight);
 
           return StreamBuilder<WeatherNow>(
             stream: _weather$,
@@ -88,12 +84,14 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
 
-              // Use real weather data for temp, precip, humidity, wind
+              // Use real weather data for all metrics
               if (weather != null) {
                 _push(tempHistory, weather.tempF);
                 _push(precipHistory, weather.precipProb);
                 _push(humidHistory, weather.humidity);
                 _push(windHistory, weather.windMph);
+                _push(moistHistory, weather.soilMoisture);
+                _push(sunHistory, weather.solarRadiation);
               }
 
               return CustomScrollView(
@@ -144,10 +142,16 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         MetricCard(
                           title: 'Soil Moisture',
-                          value: '${s.soilMoisture.toStringAsFixed(0)}%',
-                          subtitle: s.soilMoisture < 35
+                          value: weather == null
+                              ? 'Loading...'
+                              : '${weather.soilMoisture.toStringAsFixed(0)}%',
+                          subtitle: weather == null
+                              ? 'Fetching weather data'
+                              : !weather.hasSoilData
+                              ? 'Estimated (real sensors needed)'
+                              : weather.soilMoisture < 35
                               ? 'Dry • Auto-watering recommended'
-                              : s.soilMoisture > 75
+                              : weather.soilMoisture > 75
                               ? 'Wet • Watering paused'
                               : 'Healthy range',
                           icon: FontAwesomeIcons.droplet,
@@ -185,14 +189,20 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         MetricCard(
                           title: 'Sunlight',
-                          value: '${s.sunlight.toStringAsFixed(0)} kLux',
-                          subtitle: s.sunlight < 8
+                          value: weather == null
+                              ? 'Loading...'
+                              : '${weather.solarRadiation.toStringAsFixed(0)} kLux',
+                          subtitle: weather == null
+                              ? 'Fetching weather data'
+                              : !weather.hasSolarData
+                              ? 'Data unavailable'
+                              : weather.solarRadiation < 8
                               ? 'Low light'
                               : 'Good exposure',
                           icon: FontAwesomeIcons.sun,
                           color: scheme.surfaceContainerLow,
                           sparkline: sunHistory,
-                          minMax: const MinMax(0, 70),
+                          minMax: const MinMax(0, 120),
                         ),
                       ],
                     ),
