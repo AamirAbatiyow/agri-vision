@@ -15,6 +15,7 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
   String? _error;
   List<dynamic> _labels = [];
   Map<String, dynamic> _ai = {};
+  bool _hasSuccessfullyLoaded = false;
 
   // Use the same backend as your Rekognition file
   static const String backendUrl = 'http://10.102.96.77:8000';
@@ -34,14 +35,16 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
     });
 
     try {
+      // Fetch standard Rekognition labels
       final r1 = await http.get(Uri.parse('$backendUrl/results'));
       if (r1.statusCode == 200) {
         final j = jsonDecode(r1.body) as Map<String, dynamic>;
         _labels = (j['labels'] ?? []) as List<dynamic>;
       } else {
-        throw Exception('results ${r1.statusCode}');
+        throw Exception('Standard labels unavailable (${r1.statusCode})');
       }
 
+      // Fetch AI-powered disease analysis
       final r2 = await http.get(Uri.parse('$backendUrl/ai_results'));
       if (r2.statusCode == 200) {
         final j = jsonDecode(r2.body);
@@ -54,27 +57,35 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
           _ai = {};
         }
       } else {
-        throw Exception('ai_results ${r2.statusCode}');
+        throw Exception('AI analysis unavailable (${r2.statusCode})');
       }
 
       if (mounted) {
-        setState(() => _loading = false);
-        // tell caller we succeeded so Profile can bump "Analyses"
-        Navigator.of(context).pop(true);
-        // Re-open this page so user still sees it after notifying parent
-        Future.microtask(() {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AnalysisResultsPage()),
-          );
+        setState(() {
+          _loading = false;
+          _hasSuccessfullyLoaded = true;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Failed to fetch results: $e';
+          _error = 'Failed to fetch results: $e\n\nMake sure the backend server is running on $backendUrl';
         });
       }
+    }
+  }
+
+  // Called when user manually refreshes
+  Future<void> _refresh() async {
+    await _fetchAll();
+    if (_hasSuccessfullyLoaded && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Results refreshed!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -99,23 +110,53 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
         title: const Text('Analysis Results'),
         actions: [
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: 'Refresh Analysis',
             icon: _loading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                    ),
                   )
                 : const Icon(Icons.refresh),
-            onPressed: _loading ? null : _fetchAll,
+            onPressed: _loading ? null : _refresh,
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? _ErrorBox(msg: _error!)
-          : ListView(
+      // Gradient background matching camera page
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [scheme.surface, scheme.surfaceContainerLow],
+          ),
+        ),
+        child: _loading
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Loading analysis results...',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : _error != null
+                ? _ErrorBox(msg: _error!)
+                : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _Card(
@@ -184,8 +225,9 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
                     ),
                   ),
                 ),
-              ],
-            ),
+                  ],
+                ),
+      ),
     );
   }
 }

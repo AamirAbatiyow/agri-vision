@@ -11,6 +11,9 @@ import '../camera/camera_page.dart'; // provides RekognitionTestPage
 // COMMUNITY
 import '../chat/chat_hub_page.dart';
 
+// AI CHAT
+import '../chat/ai_chat_page.dart';
+
 // PROFILE
 import '../profile/profile_page.dart';
 
@@ -39,6 +42,11 @@ class _HomeShellState extends State<HomeShell> {
       label: 'Community',
       icon: FontAwesomeIcons.comments,
       builder: (_) => const ChatHubPage(),
+    ),
+    _TabInfo(
+      label: 'AI Chat',
+      icon: FontAwesomeIcons.brain,
+      builder: (_) => const AiChatPage(),
     ),
     _TabInfo(
       label: 'Profile',

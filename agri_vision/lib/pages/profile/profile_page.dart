@@ -5,12 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../services/chat_store.dart';
-import '../../services/chat_api.dart';
 import '../../services/user_prefs.dart';
 import '../../services/activity_service.dart';
 import '../auth/auth_gate.dart';
-import '../results/analysis_results_page.dart'; // NEW: pretty results viewer
+import '../results/analysis_results_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -23,81 +21,22 @@ class _ProfilePageState extends State<ProfilePage> {
   XFile? _avatar;
   final _picker = ImagePicker();
 
-  int _generalSent = 0;
-  int _dmSent = 0;
-  DateTime? _lastActive;
-  int _analyses = 0;
-
-  bool _loadingCounts = false;
-
   @override
   void initState() {
     super.initState();
     ActivityService.I.onProfileVisited();
-    _analyses = ActivityService.I.photoAnalyses; // local counter
-    _refreshCounters(); // pull from server so it works even if chat tabs weren’t opened
+    
+    // Auto-refresh stats every few seconds while on this page
+    _startAutoRefresh();
   }
 
-  Future<void> _refreshCounters() async {
-    setState(() => _loadingCounts = true);
-    try {
-      final me = UserSession.username;
-
-      // --- General messages (count mine, capture last ts) ---
-      final generalRows = await ChatApi.fetchGeneral(
-        afterIso: null,
-        limit: 1000,
-      );
-      final myGen = generalRows.where((m) => m.sender == me).toList();
-      int generalCount = myGen.length;
-      DateTime? last = _maxTimeList(
-        generalRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList(),
-      );
-
-      // --- DM threads, then fetch each thread to count mine and latest ts ---
-      final threads = await ChatApi.fetchThreads(me); // [{peer, lastTs}]
-      int dmCount = 0;
-      for (final t in threads) {
-        final peer = (t['peer'] ?? '').toString();
-        if (peer.isEmpty) continue;
-        final dmRows = await ChatApi.fetchDm(
-          a: me,
-          b: peer,
-          afterIso: null,
-          limit: 1000,
-        );
-        dmCount += dmRows.where((m) => m.sender == me).length;
-        final dmLast = _maxTimeList(
-          dmRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList(),
-        );
-        if (dmLast != null) last = _maxTime(last, dmLast);
-      }
-
-      setState(() {
-        _generalSent = generalCount;
-        _dmSent = dmCount;
-        _lastActive = last;
-      });
-    } catch (_) {
-      // keep silent; UI stays as-is
-    } finally {
-      if (mounted) setState(() => _loadingCounts = false);
-    }
-  }
-
-  DateTime? _maxTime(DateTime? a, DateTime? b) {
-    if (a == null) return b;
-    if (b == null) return a;
-    return b.isAfter(a) ? b : a;
-  }
-
-  DateTime? _maxTimeList(List<DateTime?> arr) {
-    DateTime? best;
-    for (final t in arr) {
-      if (t == null) continue;
-      best = _maxTime(best, t);
-    }
-    return best;
+  void _startAutoRefresh() {
+    Future.doWhile(() async {
+      if (!mounted) return false;
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) setState(() {}); // Trigger rebuild to show latest ActivityService data
+      return mounted;
+    });
   }
 
   Future<void> _pickAvatar() async {
@@ -203,23 +142,13 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    
+    // Get live stats from ActivityService
+    final stats = ActivityService.I;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh activity',
-            icon: _loadingCounts
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const FaIcon(FontAwesomeIcons.rotate),
-            onPressed: _loadingCounts ? null : _refreshCounters,
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -333,30 +262,64 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 12),
 
-          // Pretty results viewer shortcut (no changes to camera_page.dart)
-          _Card(
-            child: ListTile(
-              leading: const FaIcon(FontAwesomeIcons.flask),
-              title: const Text('View Latest Analysis Results'),
-              subtitle: const Text(
-                'Polished display for /results and /ai_results',
-              ),
-              trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
-              onTap: () async {
-                // Open results viewer; if it fetched successfully, bump analyses count
-                final ok = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => const AnalysisResultsPage(),
+          // Enhanced Analysis Results Card with animation
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeOut,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, 20 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: _Card(
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [scheme.primary, scheme.secondary],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.primary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                );
-                if (ok == true) {
-                  setState(() {
-                    _analyses += 1;
-                    ActivityService.I
-                        .onPhotoAnalyzed(); // keep local service in sync
-                  });
-                }
-              },
+                  child: FaIcon(
+                    FontAwesomeIcons.flask,
+                    size: 18,
+                    color: scheme.onPrimary,
+                  ),
+                ),
+                title: const Text(
+                  'View Latest Analysis Results',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'AI-powered crop disease diagnosis',
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                ),
+                trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
+                onTap: () {
+                  // Simply navigate to results viewer
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AnalysisResultsPage(),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
 

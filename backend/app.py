@@ -15,6 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # AI agent
 from agent import main as run_agent_script
+from agent_usda import run_usda_query
 
 app = Flask(__name__)
 CORS(app)
@@ -289,10 +290,15 @@ def threads(username):
 
 @app.route("/ai_usda", methods=["GET"])
 def ai_usda():
-    from agent_usda import run_usda_query
     query = request.args.get("query", "")
-    result = run_usda_query(query)
-    return jsonify({"response": result})
+    if not query:
+        return jsonify({"error": "Missing query"}), 400
+
+    try:
+        response = run_usda_query(query)
+        return jsonify({"response": response}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ---------------------------
 # Run server
