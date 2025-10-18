@@ -1,4 +1,6 @@
 // lib/services/user_prefs.dart
+import 'package:flutter/material.dart';
+
 class UserPrefs {
   static String farmType = '';
   static String region = '';
@@ -6,6 +8,10 @@ class UserPrefs {
   // Unit preferences
   static bool useCelsius = false; // false = Fahrenheit, true = Celsius
   static bool useKph = false; // false = mph, true = kph
+
+  // Theme preferences
+  static bool isDarkMode = false;
+  static VoidCallback? onThemeChanged;
 
   static bool get isOnboarded => farmType.isNotEmpty && region.isNotEmpty;
 
@@ -38,5 +44,10 @@ class UserPrefs {
 
   static void toggleSpeedUnit() {
     useKph = !useKph;
+  }
+
+  static void toggleDarkMode() {
+    isDarkMode = !isDarkMode;
+    onThemeChanged?.call();
   }
 }
