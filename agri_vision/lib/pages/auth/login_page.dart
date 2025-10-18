@@ -1,6 +1,11 @@
 // lib/pages/auth/login_page.dart
+import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:http/http.dart' as http;
 
 import '../../services/chat_store.dart'; // UserSession
 import '../shell/home_shell.dart';
@@ -18,6 +23,13 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscure = true;
   bool _loading = false;
 
+  String get _apiBase {
+    // Android emulator can't reach localhost; use 10.0.2.2
+    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:5000';
+    return 'http://127.0.0.1:5000';
+    // If deploying: replace with your LAN/IP or HTTPS endpoint
+  }
+
   @override
   void dispose() {
     _userCtrl.dispose();
@@ -28,17 +40,45 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 300)); // mock delay
 
-    // username == display name
-    final name = _userCtrl.text.trim();
-    UserSession.set(user: name, name: name);
+    final username = _userCtrl.text.trim();
+    final password = _passCtrl.text;
 
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeShell()),
-      (route) => false,
-    );
+    try {
+      final url = Uri.parse('$_apiBase/login');
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['success'] == true) {
+          // username doubles as display name in AgriVision
+          UserSession.set(user: username, name: username);
+
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomeShell()),
+            (route) => false,
+          );
+          return;
+        } else {
+          _toast(data['error'] ?? 'Login failed');
+        }
+      } else {
+        _toast('Server error (${res.statusCode})');
+      }
+    } catch (e) {
+      _toast('Network error: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _guest() {

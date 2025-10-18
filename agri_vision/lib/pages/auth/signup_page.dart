@@ -1,8 +1,13 @@
 // lib/pages/auth/signup_page.dart
+import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../../services/chat_store.dart';    // UserSession
-import '../../services/user_prefs.dart';
+import '../../services/user_prefs.dart';    // onboarding storage (farmType/region)
 import '../shell/home_shell.dart';
 
 class SignupPage extends StatefulWidget {
@@ -18,38 +23,79 @@ class _SignupPageState extends State<SignupPage> {
   final _confirmCtrl = TextEditingController();
   bool _obscure1 = true, _obscure2 = true, _loading = false;
 
+  String get _apiBase {
+    if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:5000';
+    return 'http://127.0.0.1:5000';
+  }
+
   @override
   void dispose() {
-    _nameCtrl
-      ..dispose();
-    _passCtrl
-      ..dispose();
-    _confirmCtrl
-      ..dispose();
+    _nameCtrl.dispose();
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 300)); // mock network
 
-    // username == display name
-    final name = _nameCtrl.text.trim();
-    UserSession.set(user: name, name: name);
+    final username = _nameCtrl.text.trim();
+    final password = _passCtrl.text;
 
-    // Always run onboarding after signup
-    final ok = await _showOnboardingSheet();
-    if (!mounted) return;
-
-    if (ok == true) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-        (route) => false,
+    try {
+      final url = Uri.parse('$_apiBase/users'); // Flask "create user"
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+          'joined': _joinedLabel(), // optional; matches your example
+        }),
       );
-    } else {
-      setState(() => _loading = false);
+
+      if (res.statusCode == 201) {
+        // Set local session (username == display name)
+        UserSession.set(user: username, name: username);
+
+        // Collect onboarding (Farm Type + Region) locally
+        final ok = await _showOnboardingSheet();
+        if (!mounted) return;
+
+        if (ok == true) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const HomeShell()),
+            (route) => false,
+          );
+        } else {
+          setState(() => _loading = false);
+        }
+      } else {
+        final body = _safeDecode(res.body);
+        _toast(body['error'] ?? 'Failed to create user (${res.statusCode})');
+      }
+    } catch (e) {
+      _toast('Network error: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Map<String, dynamic> _safeDecode(String s) {
+    try {
+      return jsonDecode(s) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  String _joinedLabel() {
+    final now = DateTime.now();
+    const months = [
+      'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+    ];
+    return '${months[now.month - 1]} ${now.year}';
   }
 
   Future<bool?> _showOnboardingSheet() {
@@ -105,7 +151,7 @@ class _SignupPageState extends State<SignupPage> {
 
                 const SizedBox(height: 8),
 
-                // Region
+                // Region field
                 TextField(
                   controller: region,
                   decoration: const InputDecoration(
@@ -114,7 +160,6 @@ class _SignupPageState extends State<SignupPage> {
                     border: OutlineInputBorder(),
                   ),
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) {},
                 ),
 
                 const SizedBox(height: 12),
@@ -140,6 +185,10 @@ class _SignupPageState extends State<SignupPage> {
         );
       },
     );
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
