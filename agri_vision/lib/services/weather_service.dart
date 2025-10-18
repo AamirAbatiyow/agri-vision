@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 /// Current conditions model.
@@ -52,35 +53,115 @@ class WeatherService {
   final _nowCtl = StreamController<WeatherNow>.broadcast();
   Timer? _timer;
 
-  // Default location (can be configured)
-  // Using coordinates for central Iowa as an example agricultural location
+  // Current location (will be updated from device GPS)
+  // Default fallback to central Iowa if location unavailable
   double latitude = 41.8780;
   double longitude = -93.0977;
+  bool _useDeviceLocation = true;
+  bool _locationInitialized = false;
 
   List<WeatherDay> _cachedForecast = [];
 
-  /// Update the location for weather data
+  /// Update the location for weather data manually (disables auto device location)
   void setLocation(double lat, double lon) {
     latitude = lat;
     longitude = lon;
+    _useDeviceLocation = false;
+    _locationInitialized = true;
+  }
+
+  /// Enable automatic device location fetching
+  void enableDeviceLocation() {
+    _useDeviceLocation = true;
+    _locationInitialized = false;
+  }
+
+  /// Check if using device location (vs manual location)
+  bool get isUsingDeviceLocation => _useDeviceLocation;
+
+  /// Get current location coordinates
+  Map<String, double> get currentLocation => {
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  /// Get device location and update coordinates
+  Future<bool> _updateDeviceLocation() async {
+    if (!_useDeviceLocation) return true; // Skip if manual location is set
+
+    try {
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('Location services are disabled');
+        return false;
+      }
+
+      // Check permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          debugPrint('Location permissions are denied');
+          return false;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('Location permissions are permanently denied');
+        return false;
+      }
+
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low, // Low accuracy is fine for weather
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      latitude = position.latitude;
+      longitude = position.longitude;
+      _locationInitialized = true;
+      debugPrint('Location updated: $latitude, $longitude');
+      return true;
+    } catch (e) {
+      debugPrint('Error getting device location: $e');
+      return false;
+    }
   }
 
   /// Begin streaming "live" weather snapshots from Open-Meteo API.
   /// Call [stop] to halt; call [dispose] to close permanently.
-  Stream<WeatherNow> start({Duration period = const Duration(minutes: 5)}) {
+  Stream<WeatherNow> start({Duration period = const Duration(minutes: 15)}) {
     _timer?.cancel();
 
-    // Fetch immediately on start (both current weather and forecast)
-    _fetchAndBroadcast();
-    _fetchForecast();
+    // Initialize location and fetch weather data
+    _initializeAndFetch();
 
-    // Then fetch periodically
+    // Then fetch periodically (update location every hour, weather every 15 min)
+    int updateCount = 0;
     _timer = Timer.periodic(period, (_) {
-      _fetchAndBroadcast();
-      _fetchForecast();
+      updateCount++;
+      // Update location every 4 cycles (every hour if period is 15 minutes)
+      if (updateCount % 4 == 0) {
+        _initializeAndFetch();
+      } else {
+        _fetchAndBroadcast();
+        _fetchForecast();
+      }
     });
 
     return _nowCtl.stream;
+  }
+
+  /// Initialize location and fetch all weather data
+  Future<void> _initializeAndFetch() async {
+    if (!_locationInitialized) {
+      await _updateDeviceLocation();
+    }
+    _fetchAndBroadcast();
+    _fetchForecast();
   }
 
   /// Fetch current weather from Open-Meteo API and broadcast
