@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../services/chat_store.dart';
 import '../../services/user_prefs.dart';
 import '../../services/activity_service.dart';
+import '../../services/achievements_api.dart';
 import '../auth/auth_gate.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -18,11 +19,9 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // In-memory avatar (optional)
   XFile? _avatar;
   final _picker = ImagePicker();
 
-  // Derived activity
   int _generalSent = 0;
   int _dmSent = 0;
   DateTime? _lastActive;
@@ -34,12 +33,11 @@ class _ProfilePageState extends State<ProfilePage> {
     _recomputeActivity();
   }
 
-  void _recomputeActivity() {
+  void _recomputeActivity() async {
     final me = UserSession.username;
-    // General
     final g = ChatStore.I.general.where((m) => m.senderUser == me).toList();
     _generalSent = g.length;
-    // DMs (count messages sent by me across all peers)
+
     int dmCount = 0;
     DateTime? last;
     for (final peer in ChatStore.I.dmPeersByRecency()) {
@@ -50,14 +48,18 @@ class _ProfilePageState extends State<ProfilePage> {
       }
     }
     _dmSent = dmCount;
-
-    // Last active: latest of any message by me (general or dms)
     for (final m in g) {
       last = _maxTime(last, m.ts);
     }
     _lastActive = last;
 
-    setState(() {});
+    // sync achievements (idempotent on server)
+    final badges = _computeBadges(tosyncOnly: true);
+    for (final b in badges) {
+      await AchievementsApi.addBadge(me, b.title);
+    }
+
+    if (mounted) setState(() {});
   }
 
   DateTime _maxTime(DateTime? a, DateTime b) => (a == null || b.isAfter(a)) ? b : a;
@@ -89,6 +91,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (choice != null) {
       setState(() => UserPrefs.farmType = choice);
       _snack('Farm type updated');
+      // optional: persist as a badge if you want
     }
   }
 
@@ -131,8 +134,7 @@ class _ProfilePageState extends State<ProfilePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // Achievements based on chat/onboarding + new activity service
-  List<_Badge> _computeBadges() {
+  List<_Badge> _computeBadges({bool tosyncOnly = false}) {
     final b = <_Badge>[];
 
     // Chat & onboarding
@@ -142,25 +144,15 @@ class _ProfilePageState extends State<ProfilePage> {
     if (UserPrefs.farmType.isNotEmpty) b.add(const _Badge('Farm Setup Complete', FontAwesomeIcons.tractor));
     if (UserPrefs.region.isNotEmpty && UserPrefs.region != '—') b.add(const _Badge('Region Set', FontAwesomeIcons.locationDot));
 
-    // New (from ActivityService)
+    // Activity-based
     final act = ActivityService.I;
+    if (act.photoAnalyses >= 1) b.add(const _Badge('First Crop Scan', FontAwesomeIcons.seedling));
+    if (act.photoAnalyses >= 3) b.add(const _Badge('AI Analyst', FontAwesomeIcons.robot));
+    if (act.dashboardViews >= 5) b.add(const _Badge('Weather Watcher', FontAwesomeIcons.cloudSun));
+    if (act.sensorTicks >= 20) b.add(const _Badge('Moisture Master', FontAwesomeIcons.water));
+    if (act.visitedAllTabs) b.add(const _Badge('AgriVision Pioneer', FontAwesomeIcons.award));
 
-    if (act.photoAnalyses >= 1) {
-      b.add(const _Badge('First Crop Scan', FontAwesomeIcons.seedling));
-    }
-    if (act.photoAnalyses >= 3) {
-      b.add(const _Badge('AI Analyst', FontAwesomeIcons.robot));
-    }
-    if (act.dashboardViews >= 5) {
-      b.add(const _Badge('Weather Watcher', FontAwesomeIcons.cloudSun));
-    }
-    if (act.sensorTicks >= 20) {
-      b.add(const _Badge('Moisture Master', FontAwesomeIcons.water));
-    }
-    if (act.visitedAllTabs) {
-      b.add(const _Badge('AgriVision Pioneer', FontAwesomeIcons.award));
-    }
-
+    // When showing UI, we keep icons; when syncing, server only needs titles.
     return b;
   }
 
@@ -183,7 +175,6 @@ class _ProfilePageState extends State<ProfilePage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Header / identity
           _Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -197,9 +188,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       backgroundImage: _avatar == null
                           ? null
                           : (kIsWeb ? NetworkImage(_avatar!.path) : FileImage(File(_avatar!.path))) as ImageProvider?,
-                      child: _avatar == null
-                          ? const FaIcon(FontAwesomeIcons.leaf, size: 24)
-                          : null,
+                      child: _avatar == null ? const FaIcon(FontAwesomeIcons.leaf, size: 24) : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -207,10 +196,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(UserSession.displayName,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                        Text('@${UserSession.username}',
-                            style: TextStyle(color: scheme.onSurfaceVariant)),
+                        Text(UserSession.displayName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                        Text('@${UserSession.username}', style: TextStyle(color: scheme.onSurfaceVariant)),
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 8,
@@ -229,7 +216,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 12),
 
-          // Farm settings quick edit
           _Card(
             child: Column(
               children: [
@@ -253,7 +239,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 12),
 
-          // Activity / community summary
           _Card(
             child: Column(
               children: [
@@ -265,26 +250,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Row(
                     children: [
-                      _Stat(
-                        label: 'General Sent',
-                        value: '$_generalSent',
-                        icon: FontAwesomeIcons.earthAmericas,
-                      ),
-                      _Stat(
-                        label: 'DMs Sent',
-                        value: '$_dmSent',
-                        icon: FontAwesomeIcons.message,
-                      ),
-                      _Stat(
-                        label: 'Analyses',
-                        value: '${ActivityService.I.photoAnalyses}',
-                        icon: FontAwesomeIcons.magnifyingGlassChart,
-                      ),
-                      _Stat(
-                        label: 'Last Active',
-                        value: _lastActive == null ? '—' : _fmtTime(_lastActive!),
-                        icon: FontAwesomeIcons.clock,
-                      ),
+                      _Stat(label: 'General Sent', value: '$_generalSent', icon: FontAwesomeIcons.earthAmericas),
+                      _Stat(label: 'DMs Sent', value: '$_dmSent', icon: FontAwesomeIcons.message),
+                      _Stat(label: 'Analyses', value: '${ActivityService.I.photoAnalyses}', icon: FontAwesomeIcons.magnifyingGlassChart),
+                      _Stat(label: 'Last Active', value: _lastActive == null ? '—' : _fmtTime(_lastActive!), icon: FontAwesomeIcons.clock),
                     ],
                   ),
                 ),
@@ -293,7 +262,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: 12),
 
-          // Achievements
           if (badges.isNotEmpty)
             _Card(
               child: Padding(
@@ -306,9 +274,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: badges
-                          .map((b) => _BadgeChip(b: b, scheme: scheme))
-                          .toList(),
+                      children: badges.map((b) => _BadgeChip(b: b, scheme: scheme)).toList(),
                     ),
                   ],
                 ),
@@ -317,7 +283,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
           const SizedBox(height: 12),
 
-          // Logout
           _Card(
             child: ListTile(
               leading: const FaIcon(FontAwesomeIcons.rightFromBracket),
@@ -343,7 +308,6 @@ class _ProfilePageState extends State<ProfilePage> {
 class _Card extends StatelessWidget {
   final Widget child;
   const _Card({required this.child});
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -362,7 +326,6 @@ class _Pill extends StatelessWidget {
   final IconData icon;
   final String text;
   const _Pill({required this.icon, required this.text});
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -390,7 +353,6 @@ class _Stat extends StatelessWidget {
   final String value;
   final IconData icon;
   const _Stat({required this.label, required this.value, required this.icon});
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -427,7 +389,6 @@ class _BadgeChip extends StatelessWidget {
   final _Badge b;
   final ColorScheme scheme;
   const _BadgeChip({required this.b, required this.scheme});
-
   @override
   Widget build(BuildContext context) {
     return Container(

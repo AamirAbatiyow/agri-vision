@@ -5,38 +5,51 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../services/chat_store.dart';
 
 class DmChatPage extends StatefulWidget {
-  final String peerUser;
-  const DmChatPage({super.key, required this.peerUser});
+  final String peerUsername; // who you're chatting with
+  const DmChatPage({super.key, required this.peerUsername});
 
   @override
   State<DmChatPage> createState() => _DmChatPageState();
 }
 
 class _DmChatPageState extends State<DmChatPage> {
-  final TextEditingController _ctrl = TextEditingController();
-  final ScrollController _scroll = ScrollController();
+  final _input = TextEditingController();
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // begin polling this DM thread from Mongo
+    ChatStore.I.startDmPolling(widget.peerUsername);
+    // listen to store changes to auto-scroll
+    ChatStore.I.addListener(_scrollToEndSafe);
+  }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    ChatStore.I.removeListener(_scrollToEndSafe);
+    ChatStore.I.stopDmPolling(widget.peerUsername);
+    _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final text = _ctrl.text.trim();
+  Future<void> _send() async {
+    final text = _input.text.trim();
     if (text.isEmpty) return;
-    ChatStore.I.postDM(peerUser: widget.peerUser, text: text);
-    _ctrl.clear();
-    setState(() {});
-    _jumpToBottom();
+
+    // optimistic add happens inside ChatStore.postDm
+    await ChatStore.I.postDm(widget.peerUsername, text);
+    _input.clear();
+    _scrollToEndSafe();
   }
 
-  void _jumpToBottom() {
-    Future.delayed(const Duration(milliseconds: 50), () {
+  void _scrollToEndSafe() {
+    if (!_scroll.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
-          _scroll.position.maxScrollExtent + 80,
+          _scroll.position.maxScrollExtent,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
@@ -46,143 +59,125 @@ class _DmChatPageState extends State<DmChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final msgs = ChatStore.I.dmThread(widget.peerUser);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    final me = UserSession.username;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(child: Text(widget.peerUser[0].toUpperCase())),
-            const SizedBox(width: 12),
-            Text(widget.peerUser),
+            const FaIcon(FontAwesomeIcons.user, size: 16),
+            const SizedBox(width: 8),
+            Text('@${widget.peerUsername}'),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'More',
-            icon: const FaIcon(FontAwesomeIcons.ellipsisVertical),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
         children: [
+          // Messages
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-              itemCount: msgs.length,
-              itemBuilder: (context, i) {
-                final m = msgs[i];
-                final isMe = m.senderUser == UserSession.username;
-                return _DmBubble(
-                  isMe: isMe,
-                  name: m.senderName,
-                  text: m.text,
-                  time: m.ts,
+            child: AnimatedBuilder(
+              animation: ChatStore.I,
+              builder: (_, __) {
+                final items = ChatStore.I.dmThread(widget.peerUsername);
+                return ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  itemCount: items.length,
+                  itemBuilder: (_, i) {
+                    final m = items[i];
+                    final mine = m.mine || m.senderUser == me;
+                    final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+                    final bubbleColor = mine ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+                    final textColor = mine ? scheme.onPrimaryContainer : scheme.onSurface;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: align,
+                        children: [
+                          Row(
+                            mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                            children: [
+                              if (!mine)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: scheme.surfaceContainerHigh,
+                                    child: const FaIcon(FontAwesomeIcons.user, size: 10),
+                                  ),
+                                ),
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: bubbleColor,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(14),
+                                      topRight: const Radius.circular(14),
+                                      bottomLeft: Radius.circular(mine ? 14 : 4),
+                                      bottomRight: Radius.circular(mine ? 4 : 14),
+                                    ),
+                                    border: Border.all(color: scheme.outlineVariant),
+                                  ),
+                                  child: Text(m.text, style: TextStyle(color: textColor)),
+                                ),
+                              ),
+                              if (mine)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: scheme.surfaceContainerHigh,
+                                    child: const FaIcon(FontAwesomeIcons.userAstronaut, size: 10),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _fmtTime(m.ts),
+                            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),
           ),
-          const Divider(height: 1),
+
+          // Composer
           SafeArea(
             top: false,
-            child: Padding(
+            child: Container(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(top: BorderSide(color: scheme.outlineVariant)),
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: _ctrl,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(),
+                      controller: _input,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        hintText: 'Message ${widget.peerUser}…',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        hintText: 'Message @${widget.peerUsername}…',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                       ),
+                      onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    icon: const FaIcon(FontAwesomeIcons.paperPlane),
-                    label: const Text('Send'),
                     onPressed: _send,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DmBubble extends StatelessWidget {
-  final bool isMe;
-  final String name;
-  final String text;
-  final DateTime time;
-
-  const _DmBubble({
-    required this.isMe,
-    required this.name,
-    required this.text,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bubbleColor = isMe ? scheme.primaryContainer : scheme.surfaceVariant;
-    final align = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: align,
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: isMe ? 48 : 4, right: isMe ? 4 : 48),
-            child: Text(
-              name,
-              style: TextStyle(
-                fontSize: 12,
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Align(
-            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.78,
-              ),
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(14),
-                  topRight: const Radius.circular(14),
-                  bottomLeft: Radius.circular(isMe ? 14 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 14),
-                ),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: Column(
-                crossAxisAlignment: align,
-                children: [
-                  Text(text, style: const TextStyle(fontSize: 14)),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(time),
-                    style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                    icon: const FaIcon(FontAwesomeIcons.paperPlane, size: 14),
+                    label: const Text('Send'),
                   ),
                 ],
               ),
@@ -193,7 +188,7 @@ class _DmBubble extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime t) {
+  String _fmtTime(DateTime t) {
     final hh = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final mm = t.minute.toString().padLeft(2, '0');
     final ampm = t.hour >= 12 ? 'PM' : 'AM';

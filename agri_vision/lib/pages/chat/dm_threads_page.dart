@@ -1,8 +1,11 @@
 // lib/pages/chat/dm_threads_page.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/chat_store.dart';
+import '../../services/chat_api.dart';
 import 'dm_chat_page.dart';
 
 class DmThreadsPage extends StatefulWidget {
@@ -13,134 +16,243 @@ class DmThreadsPage extends StatefulWidget {
 }
 
 class _DmThreadsPageState extends State<DmThreadsPage> {
+  final _searchCtrl = TextEditingController();
+  final _newDmCtrl = TextEditingController();
+  final _refreshKey = GlobalKey<RefreshIndicatorState>();
+
+  List<_Thread> _threads = [];
+  bool _loading = false;
+  Timer? _autoTimer;
+
   @override
-  Widget build(BuildContext context) {
-    final peers = ChatStore.I.dmPeersByRecency();
+  void initState() {
+    super.initState();
+    // Load once after first frame for smoother tab switch
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    // Optional: light auto-refresh while on this tab
+    _autoTimer = Timer.periodic(const Duration(seconds: 8), (_) => _load(silent: true));
+  }
 
-    return Scaffold(
-      body: peers.isEmpty
-          ? const _EmptyDMs()
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-              itemCount: peers.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, i) {
-                final peer = peers[i];
-                final thread = ChatStore.I.dmThread(peer);
-                final last = thread.isNotEmpty ? thread.last : null;
+  @override
+  void dispose() {
+    _autoTimer?.cancel();
+    _searchCtrl.dispose();
+    _newDmCtrl.dispose();
+    super.dispose();
+  }
 
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(
-                      peer.isNotEmpty ? peer[0].toUpperCase() : '?',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  title: Text(peer),
-                  subtitle: Text(
-                    last == null ? 'No messages yet' : _preview(last.text),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Text(
-                    last == null ? '' : _formatTime(last.ts),
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
-                  ),
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => DmChatPage(peerUser: peer)),
-                    );
-                    setState(() {});
-                  },
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Start new message',
-        child: const FaIcon(FontAwesomeIcons.plus),
-        onPressed: () => _startNewDm(context),
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
+    try {
+      final me = UserSession.username;
+      final rows = await ChatApi.fetchThreads(me); // [{peer, lastTs}]
+      final remote = rows
+          .map((r) => _Thread(
+                peer: (r['peer'] ?? '').toString(),
+                lastTs: DateTime.tryParse((r['lastTs'] ?? '').toString())?.toLocal(),
+              ))
+          .where((t) => t.peer.isNotEmpty)
+          .toList();
+
+      // Merge local peers from ChatStore (if user opened DMs locally but server has none yet)
+      final localPeers = ChatStore.I.dmPeersByRecency();
+      for (final p in localPeers) {
+        if (p == me) continue;
+        if (!remote.any((t) => t.peer == p)) {
+          final list = ChatStore.I.dmThread(p);
+          final last = list.isNotEmpty ? list.last.ts : null;
+          remote.add(_Thread(peer: p, lastTs: last));
+        }
+      }
+
+      // Sort newest first
+      remote.sort((a, b) {
+        final at = a.lastTs ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = b.lastTs ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bt.compareTo(at);
+      });
+
+      if (mounted) setState(() => _threads = remote);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _openDm(String peer) {
+    if (peer.isEmpty || peer == UserSession.username) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => DmChatPage(peerUsername: peer)),
+    );
+  }
+
+  Future<void> _createDmDialog() async {
+    _newDmCtrl.clear();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Start new DM'),
+        content: TextField(
+          controller: _newDmCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Peer username',
+            hintText: 'e.g., farmer_jane',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+          onSubmitted: (_) => Navigator.pop(context, true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Start')),
+        ],
       ),
     );
+    if (ok == true) {
+      final peer = _newDmCtrl.text.trim();
+      if (peer.isEmpty || peer == UserSession.username) return;
+      // ensure local list has this peer so it appears immediately
+      ChatStore.I.dmThread(peer);
+      if (mounted) setState(() {});
+      _openDm(peer);
+    }
   }
 
-  Future<void> _startNewDm(BuildContext context) async {
-    final choices = ChatStore.I.knownUsers();
-    if (choices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No other users available.')));
-      return;
-    }
-    final peer = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (_) => _PeerPicker(users: choices),
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final query = _searchCtrl.text.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? _threads
+        : _threads.where((t) => t.peer.toLowerCase().contains(query)).toList();
+
+    return Column(
+      children: [
+        // Search + New DM
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: 'Search users…',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Start new DM',
+                child: FilledButton.icon(
+                  icon: const FaIcon(FontAwesomeIcons.penToSquare, size: 14),
+                  label: const Text('New'),
+                  onPressed: _createDmDialog,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Expanded(
+          child: RefreshIndicator(
+            key: _refreshKey,
+            onRefresh: _load,
+            child: _loading && _threads.isEmpty
+                ? const _LoadingList()
+                : filtered.isEmpty
+                    ? ListView(
+                        children: [
+                          SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                          Center(
+                            child: Text(
+                              query.isEmpty ? 'No DMs yet.\nTap “New” to start one.' : 'No results.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final t = filtered[i];
+                          final last = t.lastTs == null ? '—' : _fmtTime(t.lastTs!);
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: scheme.surfaceContainerHigh,
+                              child: const FaIcon(FontAwesomeIcons.user, size: 14),
+                            ),
+                            title: Text('@${t.peer}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text('Last active: $last'),
+                            trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
+                            onTap: () => _openDm(t.peer),
+                          );
+                        },
+                      ),
+          ),
+        ),
+      ],
     );
-    if (peer == null) return;
-    if (mounted) {
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => DmChatPage(peerUser: peer)));
-      setState(() {});
-    }
   }
 
-  String _preview(String t) {
-    final s = t.replaceAll('\n', ' ').trim();
-    return s.isEmpty ? '(attachment)' : s;
-  }
-
-  String _formatTime(DateTime t) {
+  String _fmtTime(DateTime t) {
     final hh = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final mm = t.minute.toString().padLeft(2, '0');
     final ampm = t.hour >= 12 ? 'PM' : 'AM';
-    return '$hh:$mm $ampm';
+    final today = DateTime.now();
+    final isToday = t.year == today.year && t.month == today.month && t.day == today.day;
+    return isToday ? '$hh:$mm $ampm' : '${t.month}/${t.day}/${t.year.toString().substring(2)}';
   }
 }
 
-class _EmptyDMs extends StatelessWidget {
-  const _EmptyDMs();
+class _Thread {
+  final String peer;
+  final DateTime? lastTs;
+  _Thread({required this.peer, required this.lastTs});
+}
+
+class _LoadingList extends StatelessWidget {
+  const _LoadingList();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const FaIcon(FontAwesomeIcons.envelopeOpenText, size: 48),
-            const SizedBox(height: 12),
-            const Text('No messages yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(
-              'Start a conversation with someone from the community.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ],
+    final scheme = Theme.of(context).colorScheme;
+    return ListView.builder(
+      itemCount: 6,
+      itemBuilder: (_, i) => ListTile(
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: scheme.surfaceContainerHigh,
+          child: const SizedBox.shrink(),
         ),
-      ),
-    );
-  }
-}
-
-class _PeerPicker extends StatelessWidget {
-  final List<String> users;
-  const _PeerPicker({required this.users});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemBuilder: (context, i) {
-          final u = users[i];
-          return ListTile(
-            leading: CircleAvatar(child: Text(u[0].toUpperCase())),
-            title: Text(u),
-            onTap: () => Navigator.pop(context, u),
-          );
-        },
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemCount: users.length,
+        title: Container(
+          height: 12,
+          width: double.infinity,
+          margin: const EdgeInsets.only(right: 80),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+        subtitle: Container(
+          height: 10,
+          width: 120,
+          margin: const EdgeInsets.only(top: 6, right: 160),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
       ),
     );
   }

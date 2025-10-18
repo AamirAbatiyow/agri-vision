@@ -13,29 +13,43 @@ class GeneralChatPage extends StatefulWidget {
 }
 
 class _GeneralChatPageState extends State<GeneralChatPage> {
-  final TextEditingController _ctrl = TextEditingController();
-  final ScrollController _scroll = ScrollController();
+  final _input = TextEditingController();
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // begin polling Mongo general channel
+    ChatStore.I.startGeneralPolling();
+    // listen for updates to auto-scroll
+    ChatStore.I.addListener(_scrollToEndSafe);
+  }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    ChatStore.I.removeListener(_scrollToEndSafe);
+    // keep polling running while user is on other tabs? Up to you.
+    // If you want to stop when leaving this tab, uncomment next line:
+    // ChatStore.I.stopGeneralPolling();
+    _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final txt = _ctrl.text;
-    ChatStore.I.postGeneral(txt);
-    _ctrl.clear();
-    setState(() {});
-    _jumpToBottom();
+  Future<void> _send() async {
+    final text = _input.text.trim();
+    if (text.isEmpty) return;
+    await ChatStore.I.postGeneral(text); // optimistic append inside store
+    _input.clear();
+    _scrollToEndSafe();
   }
 
-  void _jumpToBottom() {
-    Future.delayed(const Duration(milliseconds: 50), () {
+  void _scrollToEndSafe() {
+    if (!_scroll.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
-          _scroll.position.maxScrollExtent + 80,
+          _scroll.position.maxScrollExtent,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
@@ -43,79 +57,178 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
     });
   }
 
+  void _maybeOpenDm(String sender) async {
+    final me = UserSession.username;
+    if (sender == me) return; // no DM with self
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Start Direct Message'),
+        content: Text('Message @$sender privately?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Start')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => DmChatPage(peerUsername: sender)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final msgs = ChatStore.I.general;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToBottom());
+    final me = UserSession.username;
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
+        // Header / tip
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+          ),
+          child: Row(
+            children: [
+              const FaIcon(FontAwesomeIcons.earthAmericas, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'General Chat — long-press a message to DM its sender.',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Messages
         Expanded(
-          child: ListView.builder(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-            itemCount: msgs.length,
-            itemBuilder: (context, i) {
-              final m = msgs[i];
-              final isMe = m.senderUser == UserSession.username;
-              return _MessageTile(
-                isMe: isMe,
-                name: m.senderName,
-                text: m.text,
-                time: m.ts,
-                onLongPress: isMe
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DmChatPage(peerUser: m.senderUser),
-                          ),
-                        ).then((_) => setState(() {}));
-                      },
+          child: AnimatedBuilder(
+            animation: ChatStore.I,
+            builder: (_, __) {
+              final items = ChatStore.I.general;
+              return ListView.builder(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                itemCount: items.length,
+                itemBuilder: (_, i) {
+                  final m = items[i];
+                  final mine = m.mine || m.senderUser == me;
+                  final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+                  final bubbleColor = mine ? scheme.primaryContainer : scheme.surfaceContainerHighest;
+                  final textColor = mine ? scheme.onPrimaryContainer : scheme.onSurface;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      crossAxisAlignment: align,
+                      children: [
+                        Row(
+                          mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                          children: [
+                            if (!mine)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: scheme.surfaceContainerHigh,
+                                  child: const FaIcon(FontAwesomeIcons.user, size: 12),
+                                ),
+                              ),
+                            Flexible(
+                              child: GestureDetector(
+                                onLongPress: () => _maybeOpenDm(m.senderUser),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: bubbleColor,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(14),
+                                      topRight: const Radius.circular(14),
+                                      bottomLeft: Radius.circular(mine ? 14 : 4),
+                                      bottomRight: Radius.circular(mine ? 4 : 14),
+                                    ),
+                                    border: Border.all(color: scheme.outlineVariant),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (!mine)
+                                        Padding(
+                                          padding: const EdgeInsets.only(bottom: 4),
+                                          child: Text(
+                                            '@${m.senderUser}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                      Text(m.text, style: TextStyle(color: textColor)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (mine)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: scheme.surfaceContainerHigh,
+                                  child: const FaIcon(FontAwesomeIcons.userAstronaut, size: 12),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _fmtTime(m.ts),
+                          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
             },
           ),
         ),
-        const Divider(height: 1),
+
+        // Composer
         SafeArea(
           top: false,
-          child: Padding(
+          child: Container(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              border: Border(top: BorderSide(color: scheme.outlineVariant)),
+            ),
             child: Row(
               children: [
-                IconButton(
-                  tooltip: 'Insert mention',
-                  icon: const FaIcon(FontAwesomeIcons.at),
-                  onPressed: () {
-                    final others = ChatStore.I.knownUsers();
-                    if (others.isEmpty) return;
-                    final first = others.first;
-                    _ctrl.text = '${_ctrl.text}@$first ';
-                    _ctrl.selection = TextSelection.fromPosition(
-                      TextPosition(offset: _ctrl.text.length),
-                    );
-                  },
-                ),
                 Expanded(
                   child: TextField(
-                    controller: _ctrl,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
-                      hintText: 'Message as ${UserSession.displayName}…',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      hintText: 'Message the community…',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                     ),
+                    onSubmitted: (_) => _send(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
-                  icon: const FaIcon(FontAwesomeIcons.paperPlane),
-                  label: const Text('Send'),
                   onPressed: _send,
+                  icon: const FaIcon(FontAwesomeIcons.paperPlane, size: 14),
+                  label: const Text('Send'),
                 ),
               ],
             ),
@@ -124,88 +237,13 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
       ],
     );
   }
-}
 
-class _MessageTile extends StatelessWidget {
-  final bool isMe;
-  final String name;
-  final String text;
-  final DateTime time;
-  final VoidCallback? onLongPress;
-
-  const _MessageTile({
-    required this.isMe,
-    required this.name,
-    required this.text,
-    required this.time,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bubbleColor = isMe ? scheme.primaryContainer : scheme.surfaceVariant;
-    final align = isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-
-    return GestureDetector(
-      onLongPress: onLongPress,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          crossAxisAlignment: align,
-          children: [
-            Padding(
-              padding: EdgeInsets.only(left: isMe ? 48 : 4, right: isMe ? 4 : 48),
-              child: Text(
-                name,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Align(
-              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.78,
-                ),
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: bubbleColor,
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(14),
-                    topRight: const Radius.circular(14),
-                    bottomLeft: Radius.circular(isMe ? 14 : 4),
-                    bottomRight: Radius.circular(isMe ? 4 : 14),
-                  ),
-                  border: Border.all(color: scheme.outlineVariant),
-                ),
-                child: Column(
-                  crossAxisAlignment: align,
-                  children: [
-                    Text(text, style: const TextStyle(fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatTime(time),
-                      style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatTime(DateTime t) {
+  String _fmtTime(DateTime t) {
     final hh = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final mm = t.minute.toString().padLeft(2, '0');
     final ampm = t.hour >= 12 ? 'PM' : 'AM';
-    return '$hh:$mm $ampm';
-    }
+    final today = DateTime.now();
+    final isToday = t.year == today.year && t.month == today.month && t.day == today.day;
+    return isToday ? '$hh:$mm $ampm' : '${t.month}/${t.day}/${t.year.toString().substring(2)}';
+  }
 }
