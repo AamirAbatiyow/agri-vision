@@ -300,6 +300,10 @@ class _WeatherNowCard extends StatelessWidget {
     final humid = now == null ? '—' : '${now!.humidity.toStringAsFixed(0)}%';
     final precip = now == null ? '—' : '${now!.precipProb.toStringAsFixed(0)}%';
     final wind = now == null ? '—' : '${now!.windMph.toStringAsFixed(0)} mph';
+    final soil = now == null ? '—' : '${now!.soilMoisture.toStringAsFixed(0)}%';
+    final sun = now == null
+        ? '—'
+        : '${now!.solarRadiation.toStringAsFixed(0)} kLux';
 
     return Container(
       decoration: BoxDecoration(
@@ -333,12 +337,17 @@ class _WeatherNowCard extends StatelessWidget {
                       icon: FontAwesomeIcons.fireFlameCurved,
                       text: 'Feels $feels',
                     ),
-                    _ChipText(icon: FontAwesomeIcons.water, text: 'Hum $humid'),
                     _ChipText(
                       icon: FontAwesomeIcons.cloudRain,
                       text: 'Precip $precip',
                     ),
+                    _ChipText(
+                      icon: FontAwesomeIcons.droplet,
+                      text: 'Soil $soil',
+                    ),
+                    _ChipText(icon: FontAwesomeIcons.water, text: 'Hum $humid'),
                     _ChipText(icon: FontAwesomeIcons.wind, text: 'Wind $wind'),
+                    _ChipText(icon: FontAwesomeIcons.sun, text: 'Sun $sun'),
                   ],
                 ),
               ],
