@@ -21,21 +21,43 @@ class _DashboardPageState extends State<DashboardPage> {
   late final Stream<WeatherNow> _weather$;
   List<WeatherDay> _forecast = [];
 
+  // Cache converted hourly trends to avoid recalculating on every build
+  List<double> _tempHistoryCache = [];
+  List<double> _windHistoryCache = [];
+  bool _lastUsedCelsius = false;
+  bool _lastUsedKph = false;
+
   // Get hourly trends from weather service (past 12h + next 12h)
   // Temperature and wind are converted based on user preferences
-  List<double> get tempHistory =>
-      (WeatherService.I.hourlyTrends['temperature'] ?? [])
+  List<double> get tempHistory {
+    // Only recalculate if unit preference changed
+    if (_lastUsedCelsius != UserPrefs.useCelsius || _tempHistoryCache.isEmpty) {
+      _tempHistoryCache = (WeatherService.I.hourlyTrends['temperature'] ?? [])
           .map((t) => UserPrefs.convertTemp(t))
           .toList();
+      _lastUsedCelsius = UserPrefs.useCelsius;
+    }
+    return _tempHistoryCache;
+  }
+
   List<double> get precipHistory =>
       WeatherService.I.hourlyTrends['precipitation'] ?? [];
   List<double> get moistHistory =>
       WeatherService.I.hourlyTrends['soilMoisture'] ?? [];
   List<double> get humidHistory =>
       WeatherService.I.hourlyTrends['humidity'] ?? [];
-  List<double> get windHistory => (WeatherService.I.hourlyTrends['wind'] ?? [])
-      .map((w) => UserPrefs.convertSpeed(w))
-      .toList();
+
+  List<double> get windHistory {
+    // Only recalculate if unit preference changed
+    if (_lastUsedKph != UserPrefs.useKph || _windHistoryCache.isEmpty) {
+      _windHistoryCache = (WeatherService.I.hourlyTrends['wind'] ?? [])
+          .map((w) => UserPrefs.convertSpeed(w))
+          .toList();
+      _lastUsedKph = UserPrefs.useKph;
+    }
+    return _windHistoryCache;
+  }
+
   List<double> get sunHistory =>
       WeatherService.I.hourlyTrends['solarRadiation'] ?? [];
 

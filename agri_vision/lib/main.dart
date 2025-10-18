@@ -25,7 +25,9 @@ class _AgriVisionAppState extends State<AgriVisionApp> {
     super.initState();
     // Listen for theme changes
     UserPrefs.onThemeChanged = () {
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     };
   }
 
@@ -49,6 +51,8 @@ class _AgriVisionAppState extends State<AgriVisionApp> {
         useMaterial3: true,
       ),
       themeMode: UserPrefs.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      // Instant transition (no animation) for best performance
+      themeAnimationDuration: Duration.zero,
       initialRoute: '/',
       routes: {
         '/': (_) => const AuthGatePage(), // Pick Login / Sign Up
