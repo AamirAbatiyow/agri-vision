@@ -60,6 +60,9 @@ class WeatherService {
   bool _useDeviceLocation = true;
   bool _locationInitialized = false;
 
+  // Cache the latest weather data
+  WeatherNow? _latestWeather;
+
   List<WeatherDay> _cachedForecast = [];
 
   /// Update the location for weather data manually (disables auto device location)
@@ -84,6 +87,9 @@ class WeatherService {
     'latitude': latitude,
     'longitude': longitude,
   };
+
+  /// Get the latest cached weather data (synchronous)
+  WeatherNow? get latestWeather => _latestWeather;
 
   /// Get device location and update coordinates
   Future<bool> _updateDeviceLocation() async {
@@ -152,6 +158,18 @@ class WeatherService {
       }
     });
 
+    // If we have cached weather, emit it immediately
+    if (_latestWeather != null) {
+      Future.microtask(() {
+        if (!_nowCtl.isClosed) {
+          debugPrint(
+            'Emitting cached weather data: ${_latestWeather!.tempF}°F',
+          );
+          _nowCtl.add(_latestWeather!);
+        }
+      });
+    }
+
     return _nowCtl.stream;
   }
 
@@ -170,6 +188,7 @@ class WeatherService {
       debugPrint('Fetching weather for: $latitude, $longitude');
       final weather = await _fetchCurrentWeather();
       if (weather != null && !_nowCtl.isClosed) {
+        _latestWeather = weather; // Cache the latest data
         debugPrint(
           'Broadcasting weather: ${weather.tempF}°F, ${weather.condition}',
         );

@@ -22,10 +22,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // rolling history for sparklines
   final List<double> tempHistory = [];
-  final List<double> precipHistory = [];
+  final List<double> precipHistory = []; // from weather API
   final List<double> moistHistory = [];
-  final List<double> humidHistory = [];
-  final List<double> windHistory = [];
+  final List<double> humidHistory = []; // from weather API
+  final List<double> windHistory = []; // from weather API
   final List<double> sunHistory = [];
 
   @override
@@ -65,17 +65,16 @@ class _DashboardPageState extends State<DashboardPage> {
           final s = sensorSnap.data!;
           ActivityService.I.onSensorTick();
 
-          _push(tempHistory, s.temperatureF);
-          _push(precipHistory, s.precipitation);
+          // Only keep soil moisture and sunlight from sensors
           _push(moistHistory, s.soilMoisture);
-          _push(humidHistory, s.humidity);
-          _push(windHistory, s.windMph);
           _push(sunHistory, s.sunlight);
 
           return StreamBuilder<WeatherNow>(
             stream: _weather$,
             builder: (context, weatherSnap) {
-              final weather = weatherSnap.data;
+              // Use stream data if available, otherwise fallback to cached data
+              final weather =
+                  weatherSnap.data ?? WeatherService.I.latestWeather;
 
               // Debug: Log weather status
               if (weatherSnap.hasError) {
@@ -83,11 +82,18 @@ class _DashboardPageState extends State<DashboardPage> {
               }
               if (weather != null) {
                 debugPrint('Weather data received: ${weather.tempF}°F');
+              } else {
+                debugPrint(
+                  'No weather data yet (stream: ${weatherSnap.hasData}, cached: ${WeatherService.I.latestWeather != null})',
+                );
               }
 
-              // Use real weather temperature for metric card
+              // Use real weather data for temp, precip, humidity, wind
               if (weather != null) {
                 _push(tempHistory, weather.tempF);
+                _push(precipHistory, weather.precipProb);
+                _push(humidHistory, weather.humidity);
+                _push(windHistory, weather.windMph);
               }
 
               return CustomScrollView(
@@ -125,8 +131,12 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         MetricCard(
                           title: 'Precipitation',
-                          value: '${s.precipitation.toStringAsFixed(0)}%',
-                          subtitle: _trendText(precipHistory),
+                          value: weather == null
+                              ? 'Loading...'
+                              : '${weather.precipProb.toStringAsFixed(0)}%',
+                          subtitle: weather == null
+                              ? 'Fetching weather data'
+                              : _trendText(precipHistory),
                           icon: FontAwesomeIcons.cloudRain,
                           color: scheme.secondaryContainer,
                           sparkline: precipHistory,
@@ -147,8 +157,12 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         MetricCard(
                           title: 'Humidity',
-                          value: '${s.humidity.toStringAsFixed(0)}%',
-                          subtitle: _trendText(humidHistory),
+                          value: weather == null
+                              ? 'Loading...'
+                              : '${weather.humidity.toStringAsFixed(0)}%',
+                          subtitle: weather == null
+                              ? 'Fetching weather data'
+                              : _trendText(humidHistory),
                           icon: FontAwesomeIcons.water,
                           color: scheme.surfaceContainerHighest,
                           sparkline: humidHistory,
@@ -156,8 +170,12 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         MetricCard(
                           title: 'Wind',
-                          value: '${s.windMph.toStringAsFixed(1)} mph',
-                          subtitle: s.windMph > 15
+                          value: weather == null
+                              ? 'Loading...'
+                              : '${weather.windMph.toStringAsFixed(1)} mph',
+                          subtitle: weather == null
+                              ? 'Fetching weather data'
+                              : weather.windMph > 15
                               ? 'Breezy • Secure covers'
                               : 'Calm',
                           icon: FontAwesomeIcons.wind,
