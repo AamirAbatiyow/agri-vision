@@ -75,6 +75,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('AgriVision Dashboard'),
@@ -83,7 +85,11 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(
             icon: Text(
               UserPrefs.tempUnit(),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: scheme.onSurface,
+              ),
             ),
             tooltip: 'Toggle temperature unit',
             onPressed: () {
@@ -96,7 +102,11 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(
             icon: Text(
               UserPrefs.speedUnit(),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: scheme.onSurface,
+              ),
             ),
             tooltip: 'Toggle speed unit',
             onPressed: () {
@@ -121,8 +131,6 @@ class _DashboardPageState extends State<DashboardPage> {
       body: StreamBuilder<SensorSnapshot>(
         stream: _sensor$,
         builder: (context, sensorSnap) {
-          final scheme = Theme.of(context).colorScheme;
-
           // Only show loading if we don't have cached weather data
           // This allows instant display when revisiting the dashboard
           if (!sensorSnap.hasData && WeatherService.I.latestWeather == null) {
@@ -342,81 +350,158 @@ class _DashboardPageState extends State<DashboardPage> {
 
 /// --- Weather: Current conditions card ---
 
-class _WeatherNowCard extends StatelessWidget {
+class _WeatherNowCard extends StatefulWidget {
   final WeatherNow? now;
   const _WeatherNowCard({required this.now});
+
+  @override
+  State<_WeatherNowCard> createState() => _WeatherNowCardState();
+}
+
+class _WeatherNowCardState extends State<_WeatherNowCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    final emoji = now == null ? '⛅' : WeatherView.emojiFor(now!.condition);
-    final title = now?.condition ?? 'Loading…';
-    final temp = now == null
+    final emoji = widget.now == null
+        ? '⛅'
+        : WeatherView.emojiFor(widget.now!.condition);
+    final title = widget.now?.condition ?? 'Loading…';
+    final temp = widget.now == null
         ? '—'
-        : '${UserPrefs.convertTemp(now!.tempF).toStringAsFixed(0)}${UserPrefs.tempUnit()}';
-    final feels = now == null
+        : '${UserPrefs.convertTemp(widget.now!.tempF).toStringAsFixed(0)}${UserPrefs.tempUnit()}';
+    final feels = widget.now == null
         ? '—'
-        : '${UserPrefs.convertTemp(now!.feelsLikeF).toStringAsFixed(0)}${UserPrefs.tempUnit()}';
-    final humid = now == null ? '—' : '${now!.humidity.toStringAsFixed(0)}%';
-    final precip = now == null ? '—' : '${now!.precipProb.toStringAsFixed(0)}%';
-    final wind = now == null
+        : '${UserPrefs.convertTemp(widget.now!.feelsLikeF).toStringAsFixed(0)}${UserPrefs.tempUnit()}';
+    final humid = widget.now == null
         ? '—'
-        : '${UserPrefs.convertSpeed(now!.windMph).toStringAsFixed(0)} ${UserPrefs.speedUnit()}';
-    final soil = now == null ? '—' : '${now!.soilMoisture.toStringAsFixed(0)}%';
-    final sun = now == null
+        : '${widget.now!.humidity.toStringAsFixed(0)}%';
+    final precip = widget.now == null
         ? '—'
-        : '${now!.solarRadiation.toStringAsFixed(0)} kLux';
+        : '${widget.now!.precipProb.toStringAsFixed(0)}%';
+    final wind = widget.now == null
+        ? '—'
+        : '${UserPrefs.convertSpeed(widget.now!.windMph).toStringAsFixed(0)} ${UserPrefs.speedUnit()}';
+    final soil = widget.now == null
+        ? '—'
+        : '${widget.now!.soilMoisture.toStringAsFixed(0)}%';
+    final sun = widget.now == null
+        ? '—'
+        : '${widget.now!.solarRadiation.toStringAsFixed(0)} kLux';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 36)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 14,
-                  runSpacing: -4,
-                  children: [
-                    _ChipText(
-                      icon: FontAwesomeIcons.temperatureHalf,
-                      text: 'Temp $temp',
-                    ),
-                    _ChipText(
-                      icon: FontAwesomeIcons.fireFlameCurved,
-                      text: 'Feels $feels',
-                    ),
-                    _ChipText(
-                      icon: FontAwesomeIcons.cloudRain,
-                      text: 'Precip $precip',
-                    ),
-                    _ChipText(
-                      icon: FontAwesomeIcons.droplet,
-                      text: 'Soil $soil',
-                    ),
-                    _ChipText(icon: FontAwesomeIcons.water, text: 'Hum $humid'),
-                    _ChipText(icon: FontAwesomeIcons.wind, text: 'Wind $wind'),
-                    _ChipText(icon: FontAwesomeIcons.sun, text: 'Sun $sun'),
-                  ],
-                ),
-              ],
-            ),
+    // animated weather card with gradient
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primaryContainer.withOpacity(0.3),
+              scheme.surfaceContainerLow,
+            ],
           ),
-        ],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // animated emoji with shadow
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.surface.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                emoji,
+                style: TextStyle(fontSize: 40, color: scheme.onSurface),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 0.2,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 14,
+                    runSpacing: -4,
+                    children: [
+                      _ChipText(
+                        icon: FontAwesomeIcons.temperatureHalf,
+                        text: 'Temp $temp',
+                      ),
+                      _ChipText(
+                        icon: FontAwesomeIcons.fireFlameCurved,
+                        text: 'Feels $feels',
+                      ),
+                      _ChipText(
+                        icon: FontAwesomeIcons.cloudRain,
+                        text: 'Precip $precip',
+                      ),
+                      _ChipText(
+                        icon: FontAwesomeIcons.droplet,
+                        text: 'Soil $soil',
+                      ),
+                      _ChipText(
+                        icon: FontAwesomeIcons.water,
+                        text: 'Hum $humid',
+                      ),
+                      _ChipText(
+                        icon: FontAwesomeIcons.wind,
+                        text: 'Wind $wind',
+                      ),
+                      _ChipText(icon: FontAwesomeIcons.sun, text: 'Sun $sun'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -464,9 +549,13 @@ class _ForecastRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '5-Day Forecast',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurface,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -504,11 +593,20 @@ class _ForecastRow extends StatelessWidget {
                             style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
                           const SizedBox(height: 6),
-                          Text(emoji, style: const TextStyle(fontSize: 22)),
+                          Text(
+                            emoji,
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: scheme.onSurface,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           Text(
                             '$high° / $low°',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurface,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Row(
@@ -547,7 +645,7 @@ class MinMax {
   const MinMax(this.min, this.max);
 }
 
-class MetricCard extends StatelessWidget {
+class MetricCard extends StatefulWidget {
   final String title;
   final String value;
   final String subtitle;
@@ -570,65 +668,150 @@ class MetricCard extends StatelessWidget {
   });
 
   @override
+  State<MetricCard> createState() => _MetricCardState();
+}
+
+class _MetricCardState extends State<MetricCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // animated card entrance
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.9,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final onContainer = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: color,
-                child: FaIcon(icon, color: onContainer),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+    final scheme = Theme.of(context).colorScheme;
+
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        decoration: BoxDecoration(
+          // subtle gradient for depth
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [scheme.surface, scheme.surfaceContainerLow],
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Sparkline(
-                  series: sparkline,
-                  minMax: minMax,
-                  showNowMarker: showNowMarker,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
+          // enhanced shadow for modern look
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                // modern icon badge with gradient
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [widget.color, widget.color.withOpacity(0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.color.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: FaIcon(widget.icon, color: onContainer, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+                // animated value display
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.scale(
+                        scale: 0.8 + (0.2 * value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Text(
+                    widget.value,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Sparkline(
+                    series: widget.sparkline,
+                    minMax: widget.minMax,
+                    showNowMarker: widget.showNowMarker,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              subtitle,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                widget.subtitle,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 12,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -780,11 +963,20 @@ class TrendCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+              ),
               const Spacer(),
               Text(
                 _current(series),
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
               ),
             ],
           ),

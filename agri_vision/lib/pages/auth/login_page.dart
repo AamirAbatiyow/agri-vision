@@ -221,14 +221,20 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 8),
 
-                TextField(
-                  controller: region,
-                  decoration: const InputDecoration(
-                    labelText: 'Region',
-                    hintText: 'e.g., Midwest, Pacific NW',
-                    border: OutlineInputBorder(),
-                  ),
-                  textInputAction: TextInputAction.done,
+                Builder(
+                  builder: (context) {
+                    final scheme = Theme.of(context).colorScheme;
+                    return TextField(
+                      controller: region,
+                      style: TextStyle(color: scheme.onSurface),
+                      decoration: const InputDecoration(
+                        labelText: 'Region',
+                        hintText: 'e.g., Midwest, Pacific NW',
+                        border: OutlineInputBorder(),
+                      ),
+                      textInputAction: TextInputAction.done,
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 12),
@@ -275,90 +281,205 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              const SizedBox(height: 8),
-              Text(
-                'Welcome back',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Sign in to continue to AgriVision',
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
-
-              TextFormField(
-                controller: _userCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+      // subtle gradient background
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [scheme.surface, scheme.surfaceContainerLow],
+          ),
+        ),
+        child: SafeArea(
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const SizedBox(height: 8),
+                // animated fade-in for header text
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome back',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                              color: scheme.onSurface,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sign in to continue to AgriVision',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Enter your username'
-                    : null,
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 32),
 
-              TextFormField(
-                controller: _passCtrl,
-                obscureText: _obscure,
-                onFieldSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                    icon: Icon(
-                      _obscure ? Icons.visibility : Icons.visibility_off,
+                // animated form fields entrance
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      // modern text field with enhanced styling
+                      TextFormField(
+                        controller: _userCtrl,
+                        textInputAction: TextInputAction.next,
+                        style: TextStyle(color: scheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          hintText: 'Enter your username',
+                          prefixIcon: Icon(Icons.person, color: scheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Enter your username'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: _passCtrl,
+                        obscureText: _obscure,
+                        onFieldSubmitted: (_) => _submit(),
+                        style: TextStyle(color: scheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          hintText: 'Enter your password',
+                          prefixIcon: Icon(Icons.lock, color: scheme.primary),
+                          suffixIcon: IconButton(
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
+                            icon: Icon(
+                              _obscure
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Enter your password'
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // animated button with loading state
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.scale(
+                        scale: 0.9 + (0.1 * value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52, // enhanced button height
+                    child: FilledButton.icon(
+                      icon: _loading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  scheme.onPrimary,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.login),
+                      label: Text(
+                        _loading ? 'Signing in…' : 'Login',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      onPressed: _loading ? null : _submit,
                     ),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(height: 16),
+
+                // guest login button with animation
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 10 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      icon: const FaIcon(FontAwesomeIcons.userSecret, size: 18),
+                      label: const Text(
+                        'Continue as guest',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      onPressed: _loading ? null : _guest,
+                    ),
                   ),
                 ),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'Enter your password' : null,
-              ),
-
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.login),
-                  label: Text(_loading ? 'Signing in…' : 'Login'),
-                  onPressed: _loading ? null : _submit,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const FaIcon(FontAwesomeIcons.userSecret, size: 16),
-                  label: const Text('Continue as guest'),
-                  onPressed: _loading ? null : _guest,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

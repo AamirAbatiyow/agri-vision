@@ -13,7 +13,8 @@ class ChatHubPage extends StatefulWidget {
   State<ChatHubPage> createState() => _ChatHubPageState();
 }
 
-class _ChatHubPageState extends State<ChatHubPage> with SingleTickerProviderStateMixin {
+class _ChatHubPageState extends State<ChatHubPage>
+    with SingleTickerProviderStateMixin {
   late final TabController _tab;
 
   @override
@@ -36,21 +37,37 @@ class _ChatHubPageState extends State<ChatHubPage> with SingleTickerProviderStat
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
+        // modern tab bar with enhanced styling
         bottom: TabBar(
           controller: _tab,
           indicatorColor: scheme.primary,
+          indicatorWeight: 3,
+          indicatorSize: TabBarIndicatorSize.tab,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            letterSpacing: 0.5,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
           tabs: const [
-            Tab(icon: FaIcon(FontAwesomeIcons.comments), text: 'General'),
-            Tab(icon: FaIcon(FontAwesomeIcons.envelope), text: 'Direct'),
+            Tab(
+              icon: FaIcon(FontAwesomeIcons.comments, size: 20),
+              text: 'General',
+            ),
+            Tab(
+              icon: FaIcon(FontAwesomeIcons.envelope, size: 20),
+              text: 'Direct',
+            ),
           ],
         ),
       ),
+      // smooth animated tab transitions
       body: TabBarView(
         controller: _tab,
-        children: const [
-          GeneralChatPage(),
-          DmThreadsPage(),
-        ],
+        children: const [GeneralChatPage(), DmThreadsPage()],
       ),
     );
   }

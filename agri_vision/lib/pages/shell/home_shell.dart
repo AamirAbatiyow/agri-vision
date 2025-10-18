@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // DASHBOARD
-import '../dashboard/dashboard_page.dart';   // <-- your actual file/class
+import '../dashboard/dashboard_page.dart'; // <-- your actual file/class
 
 // CAMERA (you replaced this with the Rekognition script, which exposes RekognitionTestPage)
-import '../camera/camera_page.dart';    // provides RekognitionTestPage
+import '../camera/camera_page.dart'; // provides RekognitionTestPage
 
 // COMMUNITY
 import '../chat/chat_hub_page.dart';
@@ -28,7 +28,7 @@ class _HomeShellState extends State<HomeShell> {
     _TabInfo(
       label: 'Dashboard',
       icon: FontAwesomeIcons.gaugeHigh,
-      builder: (_) => const DashboardPage(),     // <-- use your DashboardPage
+      builder: (_) => const DashboardPage(), // <-- use your DashboardPage
     ),
     _TabInfo(
       label: 'Camera',
@@ -52,22 +52,61 @@ class _HomeShellState extends State<HomeShell> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: _tabs.map((t) => _KeepAlive(child: t.builder(context))).toList(),
+      // smooth animated transitions between tabs
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.05, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: IndexedStack(
+          key: ValueKey<int>(_index),
+          index: _index,
+          children: _tabs
+              .map((t) => _KeepAlive(child: t.builder(context)))
+              .toList(),
+        ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        indicatorColor: scheme.primaryContainer,
-        destinations: _tabs
-            .map(
-              (t) => NavigationDestination(
-                icon: FaIcon(t.icon, size: 18),
-                label: t.label,
-              ),
-            )
-            .toList(),
+      // enhanced navigation bar with modern styling
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          indicatorColor: scheme.primaryContainer,
+          backgroundColor: scheme.surface,
+          elevation: 0,
+          destinations: _tabs
+              .map(
+                (t) => NavigationDestination(
+                  icon: FaIcon(t.icon, size: 20),
+                  selectedIcon: FaIcon(
+                    t.icon,
+                    size: 22,
+                  ), // slightly larger when selected
+                  label: t.label,
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }
@@ -87,7 +126,8 @@ class _KeepAlive extends StatefulWidget {
   State<_KeepAlive> createState() => _KeepAliveState();
 }
 
-class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+class _KeepAliveState extends State<_KeepAlive>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   @override

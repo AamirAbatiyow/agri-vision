@@ -30,7 +30,10 @@ class _DmThreadsPageState extends State<DmThreadsPage> {
     // Load once after first frame for smoother tab switch
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
     // Optional: light auto-refresh while on this tab
-    _autoTimer = Timer.periodic(const Duration(seconds: 8), (_) => _load(silent: true));
+    _autoTimer = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => _load(silent: true),
+    );
   }
 
   @override
@@ -47,10 +50,14 @@ class _DmThreadsPageState extends State<DmThreadsPage> {
       final me = UserSession.username;
       final rows = await ChatApi.fetchThreads(me); // [{peer, lastTs}]
       final remote = rows
-          .map((r) => _Thread(
-                peer: (r['peer'] ?? '').toString(),
-                lastTs: DateTime.tryParse((r['lastTs'] ?? '').toString())?.toLocal(),
-              ))
+          .map(
+            (r) => _Thread(
+              peer: (r['peer'] ?? '').toString(),
+              lastTs: DateTime.tryParse(
+                (r['lastTs'] ?? '').toString(),
+              )?.toLocal(),
+            ),
+          )
           .where((t) => t.peer.isNotEmpty)
           .toList();
 
@@ -80,32 +87,42 @@ class _DmThreadsPageState extends State<DmThreadsPage> {
 
   void _openDm(String peer) {
     if (peer.isEmpty || peer == UserSession.username) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => DmChatPage(peerUsername: peer)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => DmChatPage(peerUsername: peer)));
   }
 
   Future<void> _createDmDialog() async {
     _newDmCtrl.clear();
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Start new DM'),
-        content: TextField(
-          controller: _newDmCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Peer username',
-            hintText: 'e.g., farmer_jane',
-            border: OutlineInputBorder(),
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: const Text('Start new DM'),
+          content: TextField(
+            controller: _newDmCtrl,
+            style: TextStyle(color: scheme.onSurface),
+            decoration: const InputDecoration(
+              labelText: 'Peer username',
+              hintText: 'e.g., farmer_jane',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+            onSubmitted: (_) => Navigator.pop(dialogContext, true),
           ),
-          autofocus: true,
-          onSubmitted: (_) => Navigator.pop(context, true),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Start')),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Start'),
+            ),
+          ],
+        );
+      },
     );
     if (ok == true) {
       final peer = _newDmCtrl.text.trim();
@@ -136,11 +153,14 @@ class _DmThreadsPageState extends State<DmThreadsPage> {
               Expanded(
                 child: TextField(
                   controller: _searchCtrl,
+                  style: TextStyle(color: scheme.onSurface),
                   decoration: InputDecoration(
                     isDense: true,
                     prefixIcon: const Icon(Icons.search),
                     hintText: 'Search users…',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -167,38 +187,48 @@ class _DmThreadsPageState extends State<DmThreadsPage> {
             child: _loading && _threads.isEmpty
                 ? const _LoadingList()
                 : filtered.isEmpty
-                    ? ListView(
-                        children: [
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-                          Center(
-                            child: Text(
-                              query.isEmpty ? 'No DMs yet.\nTap “New” to start one.' : 'No results.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: scheme.onSurfaceVariant),
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (_, i) {
-                          final t = filtered[i];
-                          final last = t.lastTs == null ? '—' : _fmtTime(t.lastTs!);
-                          return ListTile(
-                            leading: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: scheme.surfaceContainerHigh,
-                              child: const FaIcon(FontAwesomeIcons.user, size: 14),
-                            ),
-                            title: Text('@${t.peer}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('Last active: $last'),
-                            trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
-                            onTap: () => _openDm(t.peer),
-                          );
-                        },
+                ? ListView(
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.25,
                       ),
+                      Center(
+                        child: Text(
+                          query.isEmpty
+                              ? 'No DMs yet.\nTap “New” to start one.'
+                              : 'No results.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final t = filtered[i];
+                      final last = t.lastTs == null ? '—' : _fmtTime(t.lastTs!);
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: scheme.surfaceContainerHigh,
+                          child: const FaIcon(FontAwesomeIcons.user, size: 14),
+                        ),
+                        title: Text(
+                          '@${t.peer}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text('Last active: $last'),
+                        trailing: const FaIcon(
+                          FontAwesomeIcons.chevronRight,
+                          size: 14,
+                        ),
+                        onTap: () => _openDm(t.peer),
+                      );
+                    },
+                  ),
           ),
         ),
       ],
@@ -210,8 +240,11 @@ class _DmThreadsPageState extends State<DmThreadsPage> {
     final mm = t.minute.toString().padLeft(2, '0');
     final ampm = t.hour >= 12 ? 'PM' : 'AM';
     final today = DateTime.now();
-    final isToday = t.year == today.year && t.month == today.month && t.day == today.day;
-    return isToday ? '$hh:$mm $ampm' : '${t.month}/${t.day}/${t.year.toString().substring(2)}';
+    final isToday =
+        t.year == today.year && t.month == today.month && t.day == today.day;
+    return isToday
+        ? '$hh:$mm $ampm'
+        : '${t.month}/${t.day}/${t.year.toString().substring(2)}';
   }
 }
 

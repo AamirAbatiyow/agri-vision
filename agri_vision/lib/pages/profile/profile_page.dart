@@ -44,10 +44,15 @@ class _ProfilePageState extends State<ProfilePage> {
       final me = UserSession.username;
 
       // --- General messages (count mine, capture last ts) ---
-      final generalRows = await ChatApi.fetchGeneral(afterIso: null, limit: 1000);
+      final generalRows = await ChatApi.fetchGeneral(
+        afterIso: null,
+        limit: 1000,
+      );
       final myGen = generalRows.where((m) => m.sender == me).toList();
       int generalCount = myGen.length;
-      DateTime? last = _maxTimeList(generalRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList());
+      DateTime? last = _maxTimeList(
+        generalRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList(),
+      );
 
       // --- DM threads, then fetch each thread to count mine and latest ts ---
       final threads = await ChatApi.fetchThreads(me); // [{peer, lastTs}]
@@ -55,9 +60,16 @@ class _ProfilePageState extends State<ProfilePage> {
       for (final t in threads) {
         final peer = (t['peer'] ?? '').toString();
         if (peer.isEmpty) continue;
-        final dmRows = await ChatApi.fetchDm(a: me, b: peer, afterIso: null, limit: 1000);
+        final dmRows = await ChatApi.fetchDm(
+          a: me,
+          b: peer,
+          afterIso: null,
+          limit: 1000,
+        );
         dmCount += dmRows.where((m) => m.sender == me).length;
-        final dmLast = _maxTimeList(dmRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList());
+        final dmLast = _maxTimeList(
+          dmRows.map((e) => DateTime.tryParse(e.ts)?.toLocal()).toList(),
+        );
         if (dmLast != null) last = _maxTime(last, dmLast);
       }
 
@@ -89,7 +101,11 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _pickAvatar() async {
-    final x = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1024);
+    final x = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
     if (x != null) setState(() => _avatar = x);
   }
 
@@ -101,7 +117,13 @@ class _ProfilePageState extends State<ProfilePage> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            for (final f in const ['Greenhouse','Crop Farm','Orchard','Hydroponic','Backyard Garden'])
+            for (final f in const [
+              'Greenhouse',
+              'Crop Farm',
+              'Orchard',
+              'Hydroponic',
+              'Backyard Garden',
+            ])
               ListTile(
                 leading: const FaIcon(FontAwesomeIcons.tractor),
                 title: Text(f),
@@ -122,26 +144,40 @@ class _ProfilePageState extends State<ProfilePage> {
     final ctrl = TextEditingController(text: UserPrefs.region);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit region'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(
-            labelText: 'Region',
-            hintText: 'e.g., Midwest, Pacific NW',
-            border: OutlineInputBorder(),
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: const Text('Edit region'),
+          content: TextField(
+            controller: ctrl,
+            style: TextStyle(color: scheme.onSurface),
+            decoration: const InputDecoration(
+              labelText: 'Region',
+              hintText: 'e.g., Midwest, Pacific NW',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+            onSubmitted: (_) => Navigator.pop(dialogContext, true),
           ),
-          autofocus: true,
-          onSubmitted: (_) => Navigator.pop(context, true),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     );
     if (ok == true) {
-      setState(() => UserPrefs.region = ctrl.text.trim().isEmpty ? UserPrefs.region : ctrl.text.trim());
+      setState(
+        () => UserPrefs.region = ctrl.text.trim().isEmpty
+            ? UserPrefs.region
+            : ctrl.text.trim(),
+      );
       _snack('Region updated');
     }
   }
@@ -175,7 +211,11 @@ class _ProfilePageState extends State<ProfilePage> {
           IconButton(
             tooltip: 'Refresh activity',
             icon: _loadingCounts
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const FaIcon(FontAwesomeIcons.rotate),
             onPressed: _loadingCounts ? null : _refreshCounters,
           ),
@@ -196,8 +236,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       backgroundColor: scheme.surfaceContainerHighest,
                       backgroundImage: _avatar == null
                           ? null
-                          : (kIsWeb ? NetworkImage(_avatar!.path) : FileImage(File(_avatar!.path))) as ImageProvider?,
-                      child: _avatar == null ? const FaIcon(FontAwesomeIcons.leaf, size: 24) : null,
+                          : (kIsWeb
+                                    ? NetworkImage(_avatar!.path)
+                                    : FileImage(File(_avatar!.path)))
+                                as ImageProvider?,
+                      child: _avatar == null
+                          ? const FaIcon(FontAwesomeIcons.leaf, size: 24)
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -205,15 +250,35 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(UserSession.displayName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                        Text('@${UserSession.username}', style: TextStyle(color: scheme.onSurfaceVariant)),
+                        Text(
+                          UserSession.displayName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          '@${UserSession.username}',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
                         const SizedBox(height: 6),
                         Wrap(
                           spacing: 8,
                           runSpacing: -6,
                           children: [
-                            _Pill(icon: FontAwesomeIcons.tractor, text: UserPrefs.farmType.isEmpty ? 'Farm: —' : UserPrefs.farmType),
-                            _Pill(icon: FontAwesomeIcons.locationDot, text: UserPrefs.region.isEmpty ? 'Region: —' : UserPrefs.region),
+                            _Pill(
+                              icon: FontAwesomeIcons.tractor,
+                              text: UserPrefs.farmType.isEmpty
+                                  ? 'Farm: —'
+                                  : UserPrefs.farmType,
+                            ),
+                            _Pill(
+                              icon: FontAwesomeIcons.locationDot,
+                              text: UserPrefs.region.isEmpty
+                                  ? 'Region: —'
+                                  : UserPrefs.region,
+                            ),
                           ],
                         ),
                       ],
@@ -237,10 +302,28 @@ class _ProfilePageState extends State<ProfilePage> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Row(
                     children: [
-                      _Stat(label: 'General Sent', value: '$_generalSent', icon: FontAwesomeIcons.earthAmericas),
-                      _Stat(label: 'DMs Sent', value: '$_dmSent', icon: FontAwesomeIcons.message),
-                      _Stat(label: 'Analyses', value: '$_analyses', icon: FontAwesomeIcons.magnifyingGlassChart),
-                      _Stat(label: 'Last Active', value: _lastActive == null ? '—' : _fmtTime(_lastActive!), icon: FontAwesomeIcons.clock),
+                      _Stat(
+                        label: 'General Sent',
+                        value: '$_generalSent',
+                        icon: FontAwesomeIcons.earthAmericas,
+                      ),
+                      _Stat(
+                        label: 'DMs Sent',
+                        value: '$_dmSent',
+                        icon: FontAwesomeIcons.message,
+                      ),
+                      _Stat(
+                        label: 'Analyses',
+                        value: '$_analyses',
+                        icon: FontAwesomeIcons.magnifyingGlassChart,
+                      ),
+                      _Stat(
+                        label: 'Last Active',
+                        value: _lastActive == null
+                            ? '—'
+                            : _fmtTime(_lastActive!),
+                        icon: FontAwesomeIcons.clock,
+                      ),
                     ],
                   ),
                 ),
@@ -255,17 +338,22 @@ class _ProfilePageState extends State<ProfilePage> {
             child: ListTile(
               leading: const FaIcon(FontAwesomeIcons.flask),
               title: const Text('View Latest Analysis Results'),
-              subtitle: const Text('Polished display for /results and /ai_results'),
+              subtitle: const Text(
+                'Polished display for /results and /ai_results',
+              ),
               trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
               onTap: () async {
                 // Open results viewer; if it fetched successfully, bump analyses count
                 final ok = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(builder: (_) => const AnalysisResultsPage()),
+                  MaterialPageRoute(
+                    builder: (_) => const AnalysisResultsPage(),
+                  ),
                 );
                 if (ok == true) {
                   setState(() {
                     _analyses += 1;
-                    ActivityService.I.onPhotoAnalyzed(); // keep local service in sync
+                    ActivityService.I
+                        .onPhotoAnalyzed(); // keep local service in sync
                   });
                 }
               },
@@ -280,15 +368,22 @@ class _ProfilePageState extends State<ProfilePage> {
                 ListTile(
                   leading: const FaIcon(FontAwesomeIcons.tractor),
                   title: const Text('Farm Type'),
-                  subtitle: Text(UserPrefs.farmType.isEmpty ? '—' : UserPrefs.farmType),
-                  trailing: const FaIcon(FontAwesomeIcons.chevronRight, size: 14),
+                  subtitle: Text(
+                    UserPrefs.farmType.isEmpty ? '—' : UserPrefs.farmType,
+                  ),
+                  trailing: const FaIcon(
+                    FontAwesomeIcons.chevronRight,
+                    size: 14,
+                  ),
                   onTap: _editFarmType,
                 ),
                 const Divider(height: 1),
                 ListTile(
                   leading: const FaIcon(FontAwesomeIcons.locationDot),
                   title: const Text('Region'),
-                  subtitle: Text(UserPrefs.region.isEmpty ? '—' : UserPrefs.region),
+                  subtitle: Text(
+                    UserPrefs.region.isEmpty ? '—' : UserPrefs.region,
+                  ),
                   trailing: const FaIcon(FontAwesomeIcons.pen, size: 14),
                   onTap: _editRegion,
                 ),
@@ -313,19 +408,64 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-class _Card extends StatelessWidget {
+class _Card extends StatefulWidget {
   final Widget child;
   const _Card({required this.child});
+
+  @override
+  State<_Card> createState() => _CardState();
+}
+
+class _CardState extends State<_Card> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // animated card entrance
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        decoration: BoxDecoration(
+          // subtle gradient for modern depth
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [scheme.surface, scheme.surfaceContainerLow],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: widget.child,
       ),
-      child: child,
     );
   }
 }
@@ -338,49 +478,148 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant),
+        // modern pill with gradient
+        gradient: LinearGradient(
+          colors: [
+            scheme.primaryContainer.withOpacity(0.5),
+            scheme.surfaceContainerHighest,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FaIcon(icon, size: 12, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 6),
-          Text(text, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+          FaIcon(icon, size: 14, color: scheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _Stat extends StatelessWidget {
+class _Stat extends StatefulWidget {
   final String label;
   final String value;
   final IconData icon;
   const _Stat({required this.label, required this.value, required this.icon});
+
+  @override
+  State<_Stat> createState() => _StatState();
+}
+
+class _StatState extends State<_Stat> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.9,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Expanded(
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Column(
-          children: [
-            FaIcon(icon, size: 18, color: scheme.onSurfaceVariant),
-            const SizedBox(height: 6),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
-          ],
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                scheme.primaryContainer.withOpacity(0.3),
+                scheme.surfaceContainerHighest,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: FaIcon(widget.icon, size: 18, color: scheme.primary),
+              ),
+              const SizedBox(height: 8),
+              // animated value
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOut,
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.scale(
+                      scale: 0.8 + (0.2 * value),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Text(
+                  widget.value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    letterSpacing: -0.5,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

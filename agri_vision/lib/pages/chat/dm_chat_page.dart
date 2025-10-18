@@ -87,9 +87,15 @@ class _DmChatPageState extends State<DmChatPage> {
                   itemBuilder: (_, i) {
                     final m = items[i];
                     final mine = m.mine || m.senderUser == me;
-                    final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-                    final bubbleColor = mine ? scheme.primaryContainer : scheme.surfaceContainerHighest;
-                    final textColor = mine ? scheme.onPrimaryContainer : scheme.onSurface;
+                    final align = mine
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start;
+                    final bubbleColor = mine
+                        ? scheme.primaryContainer
+                        : scheme.surfaceContainerHighest;
+                    final textColor = mine
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurface;
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -97,31 +103,49 @@ class _DmChatPageState extends State<DmChatPage> {
                         crossAxisAlignment: align,
                         children: [
                           Row(
-                            mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                            mainAxisAlignment: mine
+                                ? MainAxisAlignment.end
+                                : MainAxisAlignment.start,
                             children: [
                               if (!mine)
                                 Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: CircleAvatar(
                                     radius: 12,
-                                    backgroundColor: scheme.surfaceContainerHigh,
-                                    child: const FaIcon(FontAwesomeIcons.user, size: 10),
+                                    backgroundColor:
+                                        scheme.surfaceContainerHigh,
+                                    child: const FaIcon(
+                                      FontAwesomeIcons.user,
+                                      size: 10,
+                                    ),
                                   ),
                                 ),
                               Flexible(
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: bubbleColor,
                                     borderRadius: BorderRadius.only(
                                       topLeft: const Radius.circular(14),
                                       topRight: const Radius.circular(14),
-                                      bottomLeft: Radius.circular(mine ? 14 : 4),
-                                      bottomRight: Radius.circular(mine ? 4 : 14),
+                                      bottomLeft: Radius.circular(
+                                        mine ? 14 : 4,
+                                      ),
+                                      bottomRight: Radius.circular(
+                                        mine ? 4 : 14,
+                                      ),
                                     ),
-                                    border: Border.all(color: scheme.outlineVariant),
+                                    border: Border.all(
+                                      color: scheme.outlineVariant,
+                                    ),
                                   ),
-                                  child: Text(m.text, style: TextStyle(color: textColor)),
+                                  child: Text(
+                                    m.text,
+                                    style: TextStyle(color: textColor),
+                                  ),
                                 ),
                               ),
                               if (mine)
@@ -129,8 +153,12 @@ class _DmChatPageState extends State<DmChatPage> {
                                   padding: const EdgeInsets.only(left: 8),
                                   child: CircleAvatar(
                                     radius: 12,
-                                    backgroundColor: scheme.surfaceContainerHigh,
-                                    child: const FaIcon(FontAwesomeIcons.userAstronaut, size: 10),
+                                    backgroundColor:
+                                        scheme.surfaceContainerHigh,
+                                    child: const FaIcon(
+                                      FontAwesomeIcons.userAstronaut,
+                                      size: 10,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -138,7 +166,10 @@ class _DmChatPageState extends State<DmChatPage> {
                           const SizedBox(height: 4),
                           Text(
                             _fmtTime(m.ts),
-                            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -166,9 +197,12 @@ class _DmChatPageState extends State<DmChatPage> {
                       minLines: 1,
                       maxLines: 4,
                       textInputAction: TextInputAction.newline,
+                      style: TextStyle(color: scheme.onSurface),
                       decoration: InputDecoration(
                         hintText: 'Message @${widget.peerUsername}…',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       onSubmitted: (_) => _send(),
                     ),

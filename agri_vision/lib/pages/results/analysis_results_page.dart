@@ -63,7 +63,9 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
         Navigator.of(context).pop(true);
         // Re-open this page so user still sees it after notifying parent
         Future.microtask(() {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalysisResultsPage()));
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AnalysisResultsPage()),
+          );
         });
       }
     } catch (e) {
@@ -99,7 +101,11 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
           IconButton(
             tooltip: 'Refresh',
             icon: _loading
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.refresh),
             onPressed: _loading ? null : _fetchAll,
           ),
@@ -108,73 +114,139 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _ErrorBox(msg: _error!)
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _Card(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('AI Diagnosis', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                            const SizedBox(height: 8),
-                            _KV('Disease', disease),
-                            _KV('Cause', cause),
-                            _KV('Symptoms', symptoms),
-                            const SizedBox(height: 10),
-                            const Text('Top Treatments', style: TextStyle(fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 6),
-                            if (treatments.isEmpty)
-                              Text('No treatments available', style: TextStyle(color: scheme.onSurfaceVariant))
-                            else
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: treatments.map((t) => _Chip(text: t)).toList(),
-                              ),
-                          ],
+          ? _ErrorBox(msg: _error!)
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _Card(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'AI Diagnosis',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _Card(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Standard Labels', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                            const SizedBox(height: 8),
-                            if (_labels.isEmpty)
-                              Text('No labels detected with confidence > 70%',
-                                  style: TextStyle(color: scheme.onSurfaceVariant)),
-                            for (int i = 0; i < _labels.length; i++)
-                              _LabelRow(index: i + 1, data: _labels[i]),
-                          ],
+                        const SizedBox(height: 8),
+                        _KV('Disease', disease),
+                        _KV('Cause', cause),
+                        _KV('Symptoms', symptoms),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Top Treatments',
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        if (treatments.isEmpty)
+                          Text(
+                            'No treatments available',
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          )
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: treatments
+                                .map((t) => _Chip(text: t))
+                                .toList(),
+                          ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+                const SizedBox(height: 12),
+                _Card(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Standard Labels',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_labels.isEmpty)
+                          Text(
+                            'No labels detected with confidence > 70%',
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
+                        for (int i = 0; i < _labels.length; i++)
+                          _LabelRow(index: i + 1, data: _labels[i]),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
 
-class _Card extends StatelessWidget {
+class _Card extends StatefulWidget {
   final Widget child;
   const _Card({required this.child});
+
+  @override
+  State<_Card> createState() => _CardState();
+}
+
+class _CardState extends State<_Card> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Container(
+        decoration: BoxDecoration(
+          // modern gradient card
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [scheme.surface, scheme.surfaceContainerLow],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.shadow.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: widget.child,
       ),
-      child: child,
     );
   }
 }
@@ -191,8 +263,19 @@ class _KV extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120, child: Text('$k:', style: const TextStyle(fontWeight: FontWeight.w700))),
-          Expanded(child: Text(v.isEmpty ? '—' : v, style: TextStyle(color: scheme.onSurface))),
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$k:',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              v.isEmpty ? '—' : v,
+              style: TextStyle(color: scheme.onSurface),
+            ),
+          ),
         ],
       ),
     );
@@ -206,70 +289,202 @@ class _Chip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
-        border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        // modern chip with gradient
+        gradient: LinearGradient(
+          colors: [
+            scheme.primaryContainer.withOpacity(0.6),
+            scheme.secondaryContainer.withOpacity(0.4),
+          ],
+        ),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Text(text),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: scheme.onSurface,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _LabelRow extends StatelessWidget {
+class _LabelRow extends StatefulWidget {
   final int index;
   final dynamic data;
   const _LabelRow({required this.index, required this.data});
 
   @override
+  State<_LabelRow> createState() => _LabelRowState();
+}
+
+class _LabelRowState extends State<_LabelRow>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _progressAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _progressAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final name = (data is Map && data['name'] != null) ? data['name'].toString() : 'Label $index';
-    final conf = (data is Map && data['confidence'] != null)
-        ? double.tryParse(data['confidence'].toString()) ?? 0
+    final name = (widget.data is Map && widget.data['name'] != null)
+        ? widget.data['name'].toString()
+        : 'Label ${widget.index}';
+    final conf = (widget.data is Map && widget.data['confidence'] != null)
+        ? double.tryParse(widget.data['confidence'].toString()) ?? 0
         : 0.0;
     final pct = (conf.clamp(0, 100)) / 100.0;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: scheme.primary,
-            child: Text('$index', style: const TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: pct,
-                    minHeight: 10,
-                    backgroundColor: scheme.surfaceContainerHighest,
+    return AnimatedBuilder(
+      animation: _progressAnimation,
+      builder: (context, child) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              // modern badge with gradient
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [scheme.primary, scheme.primary.withOpacity(0.7)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    '${widget.index}',
+                    style: TextStyle(
+                      color: scheme.onPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // animated progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Stack(
+                          children: [
+                            FractionallySizedBox(
+                              widthFactor: pct * _progressAnimation.value,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      scheme.primary,
+                                      scheme.primaryContainer,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      scheme.primaryContainer,
+                      scheme.secondaryContainer.withOpacity(0.5),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: scheme.outlineVariant.withOpacity(0.5),
+                  ),
+                ),
+                child: Text(
+                  '${conf.toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Text('${conf.toStringAsFixed(0)}%'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -279,10 +494,30 @@ class _ErrorBox extends StatelessWidget {
   const _ErrorBox({required this.msg});
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Text(msg, style: const TextStyle(color: Colors.red)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: scheme.errorContainer.withOpacity(0.3),
+            border: Border.all(color: scheme.error.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline, color: scheme.error),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  msg,
+                  style: TextStyle(color: scheme.onErrorContainer),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

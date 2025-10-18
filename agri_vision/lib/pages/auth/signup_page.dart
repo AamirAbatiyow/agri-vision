@@ -175,14 +175,20 @@ class _SignupPageState extends State<SignupPage> {
                 const SizedBox(height: 8),
 
                 // Region field
-                TextField(
-                  controller: region,
-                  decoration: const InputDecoration(
-                    labelText: 'Region',
-                    hintText: 'e.g., Midwest, Pacific NW',
-                    border: OutlineInputBorder(),
-                  ),
-                  textInputAction: TextInputAction.done,
+                Builder(
+                  builder: (context) {
+                    final scheme = Theme.of(context).colorScheme;
+                    return TextField(
+                      controller: region,
+                      style: TextStyle(color: scheme.onSurface),
+                      decoration: const InputDecoration(
+                        labelText: 'Region',
+                        hintText: 'e.g., Midwest, Pacific NW',
+                        border: OutlineInputBorder(),
+                      ),
+                      textInputAction: TextInputAction.done,
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 12),
@@ -222,105 +228,204 @@ class _SignupPageState extends State<SignupPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create account')),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(
-                'Join AgriVision',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your username will also be your display name.',
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
-
-              // Username == Display name
-              TextFormField(
-                controller: _nameCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Username (shown in chat)',
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+      // gradient background for visual depth
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [scheme.surface, scheme.surfaceContainerLow],
+          ),
+        ),
+        child: SafeArea(
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                // animated header entrance
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Join AgriVision',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                              color: scheme.onSurface,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your username will also be your display name.',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Enter a username' : null,
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 32),
 
-              // Password
-              TextFormField(
-                controller: _passCtrl,
-                obscureText: _obscure1,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure1 = !_obscure1),
-                    icon: Icon(
-                      _obscure1 ? Icons.visibility : Icons.visibility_off,
+                // animated form fields
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      // Username field with modern styling
+                      TextFormField(
+                        controller: _nameCtrl,
+                        textInputAction: TextInputAction.next,
+                        style: TextStyle(color: scheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Username (shown in chat)',
+                          hintText: 'Choose a username',
+                          prefixIcon: Icon(Icons.person, color: scheme.primary),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Enter a username'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Password field
+                      TextFormField(
+                        controller: _passCtrl,
+                        obscureText: _obscure1,
+                        textInputAction: TextInputAction.next,
+                        style: TextStyle(color: scheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          hintText: 'At least 4 characters',
+                          prefixIcon: Icon(Icons.lock, color: scheme.primary),
+                          suffixIcon: IconButton(
+                            onPressed: () =>
+                                setState(() => _obscure1 = !_obscure1),
+                            icon: Icon(
+                              _obscure1
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.length < 4)
+                            ? 'Use at least 4 characters'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Confirm password
+                      TextFormField(
+                        controller: _confirmCtrl,
+                        obscureText: _obscure2,
+                        onFieldSubmitted: (_) => _submit(),
+                        style: TextStyle(color: scheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Confirm password',
+                          hintText: 'Re-enter your password',
+                          prefixIcon: Icon(
+                            Icons.lock_outline,
+                            color: scheme.primary,
+                          ),
+                          suffixIcon: IconButton(
+                            onPressed: () =>
+                                setState(() => _obscure2 = !_obscure2),
+                            icon: Icon(
+                              _obscure2
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        validator: (v) => (v != _passCtrl.text)
+                            ? 'Passwords do not match'
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // animated Create button
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 1000),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.scale(
+                        scale: 0.9 + (0.1 * value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      icon: _loading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  scheme.onPrimary,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.person_add_alt_1),
+                      label: Text(
+                        _loading ? 'Creating…' : 'Create account',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      onPressed: _loading ? null : _submit,
                     ),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
-                validator: (v) => (v == null || v.length < 4)
-                    ? 'Use at least 4 characters'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-
-              // Confirm
-              TextFormField(
-                controller: _confirmCtrl,
-                obscureText: _obscure2,
-                onFieldSubmitted: (_) => _submit(),
-                decoration: InputDecoration(
-                  labelText: 'Confirm password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure2 = !_obscure2),
-                    icon: Icon(
-                      _obscure2 ? Icons.visibility : Icons.visibility_off,
-                    ),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (v) =>
-                    (v != _passCtrl.text) ? 'Passwords do not match' : null,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Create button
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.person_add_alt_1),
-                  label: Text(_loading ? 'Creating…' : 'Create account'),
-                  onPressed: _loading ? null : _submit,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
