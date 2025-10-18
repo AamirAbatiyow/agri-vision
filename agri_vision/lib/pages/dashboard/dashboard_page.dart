@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/sensor_service.dart';
+import '../../services/user_prefs.dart';
 import '../../services/weather_service.dart';
 import '../../services/activity_service.dart';
 
@@ -21,15 +22,20 @@ class _DashboardPageState extends State<DashboardPage> {
   List<WeatherDay> _forecast = [];
 
   // Get hourly trends from weather service (past 12h + next 12h)
+  // Temperature and wind are converted based on user preferences
   List<double> get tempHistory =>
-      WeatherService.I.hourlyTrends['temperature'] ?? [];
+      (WeatherService.I.hourlyTrends['temperature'] ?? [])
+          .map((t) => UserPrefs.convertTemp(t))
+          .toList();
   List<double> get precipHistory =>
       WeatherService.I.hourlyTrends['precipitation'] ?? [];
   List<double> get moistHistory =>
       WeatherService.I.hourlyTrends['soilMoisture'] ?? [];
   List<double> get humidHistory =>
       WeatherService.I.hourlyTrends['humidity'] ?? [];
-  List<double> get windHistory => WeatherService.I.hourlyTrends['wind'] ?? [];
+  List<double> get windHistory => (WeatherService.I.hourlyTrends['wind'] ?? [])
+      .map((w) => UserPrefs.convertSpeed(w))
+      .toList();
   List<double> get sunHistory =>
       WeatherService.I.hourlyTrends['solarRadiation'] ?? [];
 
@@ -70,7 +76,38 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AgriVision Dashboard')),
+      appBar: AppBar(
+        title: const Text('AgriVision Dashboard'),
+        actions: [
+          // Temperature unit toggle
+          IconButton(
+            icon: Text(
+              UserPrefs.tempUnit(),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            tooltip: 'Toggle temperature unit',
+            onPressed: () {
+              setState(() {
+                UserPrefs.toggleTempUnit();
+              });
+            },
+          ),
+          // Speed unit toggle
+          IconButton(
+            icon: Text(
+              UserPrefs.speedUnit(),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            tooltip: 'Toggle speed unit',
+            onPressed: () {
+              setState(() {
+                UserPrefs.toggleSpeedUnit();
+              });
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: StreamBuilder<SensorSnapshot>(
         stream: _sensor$,
         builder: (context, sensorSnap) {
@@ -133,14 +170,17 @@ class _DashboardPageState extends State<DashboardPage> {
                           title: 'Temperature',
                           value: weather == null
                               ? 'Loading...'
-                              : '${weather.tempF.toStringAsFixed(1)}°F',
+                              : '${UserPrefs.convertTemp(weather.tempF).toStringAsFixed(1)}${UserPrefs.tempUnit()}',
                           subtitle: weather == null
                               ? 'Fetching weather data'
                               : _trendText(tempHistory),
                           icon: FontAwesomeIcons.temperatureHalf,
                           color: scheme.primaryContainer,
                           sparkline: tempHistory,
-                          minMax: const MinMax(50, 100),
+                          minMax: MinMax(
+                            UserPrefs.convertTemp(50),
+                            UserPrefs.convertTemp(100),
+                          ),
                           showNowMarker: true,
                         ),
                         MetricCard(
@@ -195,7 +235,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           title: 'Wind',
                           value: weather == null
                               ? 'Loading...'
-                              : '${weather.windMph.toStringAsFixed(1)} mph',
+                              : '${UserPrefs.convertSpeed(weather.windMph).toStringAsFixed(1)} ${UserPrefs.speedUnit()}',
                           subtitle: weather == null
                               ? 'Fetching weather data'
                               : weather.windMph > 15
@@ -204,7 +244,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           icon: FontAwesomeIcons.wind,
                           color: scheme.surfaceContainerHigh,
                           sparkline: windHistory,
-                          minMax: const MinMax(0, 25),
+                          minMax: MinMax(0, UserPrefs.convertSpeed(25)),
                           showNowMarker: true,
                         ),
                         MetricCard(
@@ -247,7 +287,10 @@ class _DashboardPageState extends State<DashboardPage> {
                           TrendCard(
                             title: 'Temperature (12h past ← now → 12h future)',
                             series: tempHistory,
-                            minMax: const MinMax(40, 100),
+                            minMax: MinMax(
+                              UserPrefs.convertTemp(40),
+                              UserPrefs.convertTemp(100),
+                            ),
                             showNowMarker: true,
                           ),
                           const SizedBox(height: 12),
@@ -299,11 +342,17 @@ class _WeatherNowCard extends StatelessWidget {
 
     final emoji = now == null ? '⛅' : WeatherView.emojiFor(now!.condition);
     final title = now?.condition ?? 'Loading…';
-    final temp = now == null ? '—' : '${now!.tempF.toStringAsFixed(0)}°F';
-    final feels = now == null ? '—' : '${now!.feelsLikeF.toStringAsFixed(0)}°F';
+    final temp = now == null
+        ? '—'
+        : '${UserPrefs.convertTemp(now!.tempF).toStringAsFixed(0)}${UserPrefs.tempUnit()}';
+    final feels = now == null
+        ? '—'
+        : '${UserPrefs.convertTemp(now!.feelsLikeF).toStringAsFixed(0)}${UserPrefs.tempUnit()}';
     final humid = now == null ? '—' : '${now!.humidity.toStringAsFixed(0)}%';
     final precip = now == null ? '—' : '${now!.precipProb.toStringAsFixed(0)}%';
-    final wind = now == null ? '—' : '${now!.windMph.toStringAsFixed(0)} mph';
+    final wind = now == null
+        ? '—'
+        : '${UserPrefs.convertSpeed(now!.windMph).toStringAsFixed(0)} ${UserPrefs.speedUnit()}';
     final soil = now == null ? '—' : '${now!.soilMoisture.toStringAsFixed(0)}%';
     final sun = now == null
         ? '—'
@@ -431,6 +480,12 @@ class _ForecastRow extends StatelessWidget {
                   children: days.map((d) {
                     final emoji = WeatherView.emojiFor(d.condition);
                     final label = WeatherView.shortLabel(d.day);
+                    final high = UserPrefs.convertTemp(
+                      d.highF,
+                    ).toStringAsFixed(0);
+                    final low = UserPrefs.convertTemp(
+                      d.lowF,
+                    ).toStringAsFixed(0);
                     return Expanded(
                       child: Column(
                         children: [
@@ -442,7 +497,7 @@ class _ForecastRow extends StatelessWidget {
                           Text(emoji, style: const TextStyle(fontSize: 22)),
                           const SizedBox(height: 6),
                           Text(
-                            '${d.highF.toStringAsFixed(0)}° / ${d.lowF.toStringAsFixed(0)}°',
+                            '$high° / $low°',
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 2),
