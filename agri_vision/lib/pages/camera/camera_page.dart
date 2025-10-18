@@ -25,7 +25,11 @@ class _CameraPageState extends State<CameraPage> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final x = await _picker.pickImage(source: ImageSource.camera, maxWidth: 2048, imageQuality: 88);
+      final x = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 2048,
+        imageQuality: 88,
+      );
       if (x != null) setState(() => _captures.insert(0, x));
     } catch (e) {
       _snack('Camera error: $e');
@@ -51,7 +55,8 @@ class _CameraPageState extends State<CameraPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _PhotoViewer(file: file, analyzeImmediately: analyzeImmediately),
+        builder: (_) =>
+            _PhotoViewer(file: file, analyzeImmediately: analyzeImmediately),
       ),
     );
   }
@@ -73,7 +78,6 @@ class _CameraPageState extends State<CameraPage> {
             icon: const FaIcon(FontAwesomeIcons.images),
             onPressed: _busy ? null : _pickFromGallery,
           ),
-          // NEW: quick entry to your Rekognition test page
           IconButton(
             tooltip: 'AWS Rekognition Lab',
             icon: const FaIcon(FontAwesomeIcons.cloud),
@@ -88,14 +92,17 @@ class _CameraPageState extends State<CameraPage> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton.extended(
         icon: _busy
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             : const FaIcon(FontAwesomeIcons.camera),
         label: Text(_busy ? 'Working…' : 'Capture'),
         onPressed: _busy ? null : _takePhoto,
       ),
       body: Column(
         children: [
-          // Preview (latest photo or placeholder)
           AspectRatio(
             aspectRatio: 3 / 4,
             child: Container(
@@ -112,18 +119,23 @@ class _CameraPageState extends State<CameraPage> {
             ),
           ),
 
-          // Quick actions for latest
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    icon: const FaIcon(FontAwesomeIcons.magnifyingGlassChart, size: 16),
+                    icon: const FaIcon(
+                      FontAwesomeIcons.magnifyingGlassChart,
+                      size: 16,
+                    ),
                     label: const Text('Analyze Latest'),
                     onPressed: _captures.isEmpty
                         ? null
-                        : () => _openViewer(_captures.first, analyzeImmediately: true),
+                        : () => _openViewer(
+                            _captures.first,
+                            analyzeImmediately: true,
+                          ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -140,17 +152,22 @@ class _CameraPageState extends State<CameraPage> {
             ),
           ),
 
-          // Thumbnails
           Expanded(
             child: _captures.isEmpty
-                ? Center(child: Text('Your captures will appear here.', style: TextStyle(color: scheme.onSurfaceVariant)))
+                ? Center(
+                    child: Text(
+                      'Your captures will appear here.',
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
+                  )
                 : GridView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 90),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                        ),
                     itemCount: _captures.length,
                     itemBuilder: (_, i) {
                       final f = _captures[i];
@@ -170,7 +187,6 @@ class _CameraPageState extends State<CameraPage> {
   }
 }
 
-/// Displays an XFile in a way that works on mobile and web.
 class _AdaptiveImage extends StatelessWidget {
   final XFile file;
   final BoxFit fit;
@@ -214,7 +230,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       final bytes = await widget.file.length();
       final seed = name.hashCode ^ bytes.hashCode;
       final health = 60 + (seed % 41); // 60–100
-      final hydration = (seed % 3 == 0) ? 'Adequate' : (seed % 3 == 1) ? 'Slightly Dry' : 'Moist';
+      final hydration = (seed % 3 == 0)
+          ? 'Adequate'
+          : (seed % 3 == 1)
+          ? 'Slightly Dry'
+          : 'Moist';
       final sunlight = const ['Low', 'Medium', 'High'][seed % 3];
       final disease = const ['Low', 'Medium'][seed % 2];
 
@@ -231,7 +251,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
       ActivityService.I.onPhotoAnalyzed();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Analysis failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Analysis failed: $e')));
       }
     }
   }
@@ -274,7 +296,12 @@ class _PhotoViewerState extends State<_PhotoViewer> {
                         padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Row(
                           children: [
-                            Text('${e.key}: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                            Text(
+                              '${e.key}: ',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             Expanded(child: Text(e.value)),
                           ],
                         ),
@@ -289,7 +316,11 @@ class _PhotoViewerState extends State<_PhotoViewer> {
         icon: const FaIcon(FontAwesomeIcons.download),
         label: const Text('Save (system)'),
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to device (or available via share).')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Saved to device (or available via share).'),
+            ),
+          );
         },
       ),
     );

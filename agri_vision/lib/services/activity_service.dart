@@ -1,14 +1,12 @@
-// lib/services/activity_service.dart
 class ActivityService {
   ActivityService._();
   static final ActivityService I = ActivityService._();
 
-  int dashboardViews = 0;     // times the dashboard page was shown
-  int sensorTicks = 0;        // sensor snapshots processed
-  int photoAnalyses = 0;      // times "Analyze" ran in camera viewer
+  int dashboardViews = 0;
+  int sensorTicks = 0;
+  int photoAnalyses = 0;
   bool visitedAllTabs = false;
 
-  // tab visit flags (to award "Pioneer")
   bool _home = false, _camera = false, _chat = false, _profile = false;
 
   void onDashboardViewed() {

@@ -13,13 +13,14 @@ class ChatHubPage extends StatefulWidget {
   State<ChatHubPage> createState() => _ChatHubPageState();
 }
 
-class _ChatHubPageState extends State<ChatHubPage> with SingleTickerProviderStateMixin {
+class _ChatHubPageState extends State<ChatHubPage>
+    with SingleTickerProviderStateMixin {
   late final TabController _tab;
 
   @override
   void initState() {
     super.initState();
-    ActivityService.I.onChatVisited(); // track visit for achievements
+    ActivityService.I.onChatVisited();
     _tab = TabController(length: 2, vsync: this);
   }
 
@@ -47,10 +48,7 @@ class _ChatHubPageState extends State<ChatHubPage> with SingleTickerProviderStat
       ),
       body: TabBarView(
         controller: _tab,
-        children: const [
-          GeneralChatPage(),
-          DmThreadsPage(),
-        ],
+        children: const [GeneralChatPage(), DmThreadsPage()],
       ),
     );
   }

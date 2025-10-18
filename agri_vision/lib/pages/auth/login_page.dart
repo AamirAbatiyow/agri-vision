@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:http/http.dart' as http;
 
-import '../../services/chat_store.dart'; // UserSession
-import '../../services/user_prefs.dart'; // for onboarding (if we create account here)
+import '../../services/chat_store.dart';
+import '../../services/user_prefs.dart';
 import '../shell/home_shell.dart';
 
 class LoginPage extends StatefulWidget {
@@ -25,7 +25,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
 
   String get _apiBase {
-    // Android emulator uses 10.0.2.2 to reach host machine
     if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:5000';
     return 'http://127.0.0.1:5000';
   }
@@ -45,7 +44,6 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passCtrl.text;
 
     try {
-      // 1) Try LOGIN
       final loginRes = await http.post(
         Uri.parse('$_apiBase/login'),
         headers: {'Content-Type': 'application/json'},
@@ -55,7 +53,6 @@ class _LoginPageState extends State<LoginPage> {
       if (loginRes.statusCode == 200) {
         final data = jsonDecode(loginRes.body);
         if (data['success'] == true) {
-          // Success: username == display name in AgriVision
           UserSession.set(user: username, name: username);
           if (!mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
@@ -67,7 +64,6 @@ class _LoginPageState extends State<LoginPage> {
           _toast(data['error'] ?? 'Login failed');
         }
       } else if (loginRes.statusCode == 401) {
-        // 2) Offer to CREATE account with these credentials (nice DX for demos)
         final create = await _confirmCreate(username);
         if (create == true) {
           final signRes = await http.post(
@@ -81,7 +77,6 @@ class _LoginPageState extends State<LoginPage> {
           );
 
           if (signRes.statusCode == 201) {
-            // Mimic signup flow: set session, run onboarding sheet once, then go home
             UserSession.set(user: username, name: username);
             final ok = await _showOnboardingSheet();
             if (ok == true && mounted) {
@@ -92,7 +87,9 @@ class _LoginPageState extends State<LoginPage> {
             }
           } else {
             final body = _safeDecode(signRes.body);
-            _toast(body['error'] ?? 'Failed to create user (${signRes.statusCode})');
+            _toast(
+              body['error'] ?? 'Failed to create user (${signRes.statusCode})',
+            );
           }
         }
       } else {
@@ -110,10 +107,18 @@ class _LoginPageState extends State<LoginPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Create account?'),
-        content: Text('No account found for “$username”. Create one with these credentials?'),
+        content: Text(
+          'No account found for “$username”. Create one with these credentials?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Create')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Create'),
+          ),
         ],
       ),
     );
@@ -129,11 +134,23 @@ class _LoginPageState extends State<LoginPage> {
 
   String _joinedLabel() {
     final now = DateTime.now();
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${months[now.month - 1]} ${now.year}';
   }
 
-  // same onboarding sheet used on signup (Farm Type + Region)
   Future<bool?> _showOnboardingSheet() {
     final farm = ValueNotifier<String>('Greenhouse');
     final region = TextEditingController();
@@ -146,13 +163,18 @@ class _LoginPageState extends State<LoginPage> {
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.only(
-              left: 16, right: 16, top: 8,
+              left: 16,
+              right: 16,
+              top: 8,
               bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Set up your farm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Set up your farm',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 12),
 
                 ValueListenableBuilder<String>(
@@ -171,9 +193,16 @@ class _LoginPageState extends State<LoginPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               for (final f in const [
-                                'Greenhouse','Crop Farm','Orchard','Hydroponic','Backyard Garden'
+                                'Greenhouse',
+                                'Crop Farm',
+                                'Orchard',
+                                'Hydroponic',
+                                'Backyard Garden',
                               ])
-                                ListTile(title: Text(f), onTap: () => Navigator.pop(context, f)),
+                                ListTile(
+                                  title: Text(f),
+                                  onTap: () => Navigator.pop(context, f),
+                                ),
                               const SizedBox(height: 8),
                             ],
                           ),
@@ -204,7 +233,9 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: () {
                       UserPrefs.setOnboarding(
                         farm: farm.value,
-                        reg: region.text.trim().isEmpty ? '—' : region.text.trim(),
+                        reg: region.text.trim().isEmpty
+                            ? '—'
+                            : region.text.trim(),
                       );
                       Navigator.pop(context, true);
                     },
@@ -245,10 +276,17 @@ class _LoginPageState extends State<LoginPage> {
             padding: const EdgeInsets.all(24),
             children: [
               const SizedBox(height: 8),
-              Text('Welcome back',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'Welcome back',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Sign in to continue to AgriVision', style: TextStyle(color: scheme.onSurfaceVariant)),
+              Text(
+                'Sign in to continue to AgriVision',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 24),
 
               TextFormField(
@@ -257,9 +295,13 @@ class _LoginPageState extends State<LoginPage> {
                 decoration: InputDecoration(
                   labelText: 'Username',
                   prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your username' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Enter your username'
+                    : null,
               ),
               const SizedBox(height: 12),
 
@@ -272,11 +314,16 @@ class _LoginPageState extends State<LoginPage> {
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscure = !_obscure),
-                    icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(
+                      _obscure ? Icons.visibility : Icons.visibility_off,
+                    ),
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Enter your password' : null,
               ),
 
               const SizedBox(height: 24),
@@ -285,7 +332,11 @@ class _LoginPageState extends State<LoginPage> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   icon: _loading
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.login),
                   label: Text(_loading ? 'Signing in…' : 'Login'),
                   onPressed: _loading ? null : _submit,

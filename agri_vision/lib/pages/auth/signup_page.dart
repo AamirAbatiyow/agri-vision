@@ -1,4 +1,3 @@
-// lib/pages/auth/signup_page.dart
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -6,8 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../../services/chat_store.dart';    // UserSession
-import '../../services/user_prefs.dart';    // onboarding storage (farmType/region)
+import '../../services/chat_store.dart';
+import '../../services/user_prefs.dart';
 import '../shell/home_shell.dart';
 
 class SignupPage extends StatefulWidget {
@@ -44,22 +43,20 @@ class _SignupPageState extends State<SignupPage> {
     final password = _passCtrl.text;
 
     try {
-      final url = Uri.parse('$_apiBase/users'); // Flask "create user"
+      final url = Uri.parse('$_apiBase/users');
       final res = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
           'password': password,
-          'joined': _joinedLabel(), // optional; matches your example
+          'joined': _joinedLabel(),
         }),
       );
 
       if (res.statusCode == 201) {
-        // Set local session (username == display name)
         UserSession.set(user: username, name: username);
 
-        // Collect onboarding (Farm Type + Region) locally
         final ok = await _showOnboardingSheet();
         if (!mounted) return;
 
@@ -93,7 +90,18 @@ class _SignupPageState extends State<SignupPage> {
   String _joinedLabel() {
     final now = DateTime.now();
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[now.month - 1]} ${now.year}';
   }
@@ -110,16 +118,20 @@ class _SignupPageState extends State<SignupPage> {
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.only(
-              left: 16, right: 16, top: 8,
+              left: 16,
+              right: 16,
+              top: 8,
               bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Set up your farm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Set up your farm',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 12),
 
-                // Farm type picker
                 ValueListenableBuilder<String>(
                   valueListenable: farm,
                   builder: (_, v, __) => ListTile(
@@ -136,9 +148,16 @@ class _SignupPageState extends State<SignupPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               for (final f in const [
-                                'Greenhouse','Crop Farm','Orchard','Hydroponic','Backyard Garden'
+                                'Greenhouse',
+                                'Crop Farm',
+                                'Orchard',
+                                'Hydroponic',
+                                'Backyard Garden',
                               ])
-                                ListTile(title: Text(f), onTap: () => Navigator.pop(context, f)),
+                                ListTile(
+                                  title: Text(f),
+                                  onTap: () => Navigator.pop(context, f),
+                                ),
                               const SizedBox(height: 8),
                             ],
                           ),
@@ -151,7 +170,6 @@ class _SignupPageState extends State<SignupPage> {
 
                 const SizedBox(height: 8),
 
-                // Region field
                 TextField(
                   controller: region,
                   decoration: const InputDecoration(
@@ -164,14 +182,15 @@ class _SignupPageState extends State<SignupPage> {
 
                 const SizedBox(height: 12),
 
-                // Continue
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () {
                       UserPrefs.setOnboarding(
                         farm: farm.value,
-                        reg: region.text.trim().isEmpty ? '—' : region.text.trim(),
+                        reg: region.text.trim().isEmpty
+                            ? '—'
+                            : region.text.trim(),
                       );
                       Navigator.pop(context, true);
                     },
@@ -205,7 +224,9 @@ class _SignupPageState extends State<SignupPage> {
             children: [
               Text(
                 'Join AgriVision',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -214,20 +235,21 @@ class _SignupPageState extends State<SignupPage> {
               ),
               const SizedBox(height: 24),
 
-              // Username == Display name
               TextFormField(
                 controller: _nameCtrl,
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   labelText: 'Username (shown in chat)',
                   prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a username' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Enter a username' : null,
               ),
               const SizedBox(height: 12),
 
-              // Password
               TextFormField(
                 controller: _passCtrl,
                 obscureText: _obscure1,
@@ -237,15 +259,20 @@ class _SignupPageState extends State<SignupPage> {
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscure1 = !_obscure1),
-                    icon: Icon(_obscure1 ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(
+                      _obscure1 ? Icons.visibility : Icons.visibility_off,
+                    ),
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                validator: (v) => (v == null || v.length < 4) ? 'Use at least 4 characters' : null,
+                validator: (v) => (v == null || v.length < 4)
+                    ? 'Use at least 4 characters'
+                    : null,
               ),
               const SizedBox(height: 12),
 
-              // Confirm
               TextFormField(
                 controller: _confirmCtrl,
                 obscureText: _obscure2,
@@ -255,21 +282,29 @@ class _SignupPageState extends State<SignupPage> {
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscure2 = !_obscure2),
-                    icon: Icon(_obscure2 ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(
+                      _obscure2 ? Icons.visibility : Icons.visibility_off,
+                    ),
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                validator: (v) => (v != _passCtrl.text) ? 'Passwords do not match' : null,
+                validator: (v) =>
+                    (v != _passCtrl.text) ? 'Passwords do not match' : null,
               ),
 
               const SizedBox(height: 24),
 
-              // Create button
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
                   icon: _loading
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.person_add_alt_1),
                   label: Text(_loading ? 'Creating…' : 'Create account'),
                   onPressed: _loading ? null : _submit,

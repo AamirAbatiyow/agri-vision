@@ -1,4 +1,3 @@
-// lib/pages/dashboard_page.dart
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -6,8 +5,6 @@ import '../../services/sensor_service.dart';
 import '../../services/user_prefs.dart';
 import '../../services/weather_service.dart';
 import '../../services/activity_service.dart';
-
-/// --- Dashboard page with metric cards + tiny charts ---
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -21,16 +18,12 @@ class _DashboardPageState extends State<DashboardPage> {
   late final Stream<WeatherNow> _weather$;
   List<WeatherDay> _forecast = [];
 
-  // Cache converted hourly trends to avoid recalculating on every build
   List<double> _tempHistoryCache = [];
   List<double> _windHistoryCache = [];
   bool _lastUsedCelsius = false;
   bool _lastUsedKph = false;
 
-  // Get hourly trends from weather service (past 12h + next 12h)
-  // Temperature and wind are converted based on user preferences
   List<double> get tempHistory {
-    // Only recalculate if unit preference changed
     if (_lastUsedCelsius != UserPrefs.useCelsius || _tempHistoryCache.isEmpty) {
       _tempHistoryCache = (WeatherService.I.hourlyTrends['temperature'] ?? [])
           .map((t) => UserPrefs.convertTemp(t))
@@ -48,7 +41,6 @@ class _DashboardPageState extends State<DashboardPage> {
       WeatherService.I.hourlyTrends['humidity'] ?? [];
 
   List<double> get windHistory {
-    // Only recalculate if unit preference changed
     if (_lastUsedKph != UserPrefs.useKph || _windHistoryCache.isEmpty) {
       _windHistoryCache = (WeatherService.I.hourlyTrends['wind'] ?? [])
           .map((w) => UserPrefs.convertSpeed(w))
@@ -71,7 +63,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadForecast() async {
-    // Wait a moment for the initial forecast fetch to complete
     await Future.delayed(const Duration(milliseconds: 500));
     if (mounted) {
       setState(() {
@@ -80,7 +71,6 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     }
 
-    // Periodically refresh forecast every minute to pick up updates
     Future.delayed(const Duration(minutes: 1), () {
       if (mounted) {
         _loadForecast();
@@ -101,7 +91,6 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         title: const Text('AgriVision Dashboard'),
         actions: [
-          // Temperature unit toggle
           IconButton(
             icon: Text(
               UserPrefs.tempUnit(),
@@ -114,7 +103,6 @@ class _DashboardPageState extends State<DashboardPage> {
               });
             },
           ),
-          // Speed unit toggle
           IconButton(
             icon: Text(
               UserPrefs.speedUnit(),
@@ -127,7 +115,6 @@ class _DashboardPageState extends State<DashboardPage> {
               });
             },
           ),
-          // Dark mode toggle
           IconButton(
             icon: Icon(
               UserPrefs.isDarkMode ? Icons.light_mode : Icons.dark_mode,
@@ -145,13 +132,10 @@ class _DashboardPageState extends State<DashboardPage> {
         builder: (context, sensorSnap) {
           final scheme = Theme.of(context).colorScheme;
 
-          // Only show loading if we don't have cached weather data
-          // This allows instant display when revisiting the dashboard
           if (!sensorSnap.hasData && WeatherService.I.latestWeather == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Sensor data is still used for activity tracking
           if (sensorSnap.hasData) {
             ActivityService.I.onSensorTick();
           }
@@ -159,11 +143,9 @@ class _DashboardPageState extends State<DashboardPage> {
           return StreamBuilder<WeatherNow>(
             stream: _weather$,
             builder: (context, weatherSnap) {
-              // Use stream data if available, otherwise fallback to cached data
               final weather =
                   weatherSnap.data ?? WeatherService.I.latestWeather;
 
-              // Debug: Log weather status
               if (weatherSnap.hasError) {
                 debugPrint('Weather error: ${weatherSnap.error}');
               }
@@ -175,12 +157,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
 
-              // Hourly trends are now managed by WeatherService
-              // No need to manually push data - just use the getter
-
               return CustomScrollView(
                 slivers: [
-                  // --- Current Weather (from WeatherService) ---
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -188,7 +166,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
 
-                  // --- Metric grid (from SensorService + Weather) ---
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     sliver: SliverGrid.count(
@@ -301,7 +278,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
 
-                  // --- Trends ---
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -338,7 +314,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
 
-                  // --- 5-day Forecast row (from WeatherService) ---
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -561,8 +536,6 @@ class _ForecastRow extends StatelessWidget {
   }
 }
 
-/// --- UI: Metric card with sparkline ---
-
 class MinMax {
   final double min;
   final double max;
@@ -655,8 +628,6 @@ class MetricCard extends StatelessWidget {
     );
   }
 }
-
-/// --- Simple custom painter for lines (no external packages) ---
 
 class Sparkline extends StatelessWidget {
   final List<double> series;
@@ -770,8 +741,6 @@ class _LinePainter extends CustomPainter {
         oldDelegate.showNowMarker != showNowMarker;
   }
 }
-
-/// --- Trend card (bigger chart) ---
 
 class TrendCard extends StatelessWidget {
   final String title;

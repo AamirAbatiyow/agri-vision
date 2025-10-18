@@ -19,18 +19,13 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
   @override
   void initState() {
     super.initState();
-    // begin polling Mongo general channel
     ChatStore.I.startGeneralPolling();
-    // listen for updates to auto-scroll
     ChatStore.I.addListener(_scrollToEndSafe);
   }
 
   @override
   void dispose() {
     ChatStore.I.removeListener(_scrollToEndSafe);
-    // keep polling running while user is on other tabs? Up to you.
-    // If you want to stop when leaving this tab, uncomment next line:
-    // ChatStore.I.stopGeneralPolling();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -39,7 +34,7 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty) return;
-    await ChatStore.I.postGeneral(text); // optimistic append inside store
+    await ChatStore.I.postGeneral(text);
     _input.clear();
     _scrollToEndSafe();
   }
@@ -66,13 +61,21 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
         title: const Text('Start Direct Message'),
         content: Text('Message @$sender privately?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Start')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Start'),
+          ),
         ],
       ),
     );
     if (ok == true && mounted) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => DmChatPage(peerUsername: sender)));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => DmChatPage(peerUsername: sender)),
+      );
     }
   }
 
@@ -83,7 +86,6 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
 
     return Column(
       children: [
-        // Header / tip
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
@@ -105,7 +107,6 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
           ),
         ),
 
-        // Messages
         Expanded(
           child: AnimatedBuilder(
             animation: ChatStore.I,
@@ -118,9 +119,15 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                 itemBuilder: (_, i) {
                   final m = items[i];
                   final mine = m.mine || m.senderUser == me;
-                  final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-                  final bubbleColor = mine ? scheme.primaryContainer : scheme.surfaceContainerHighest;
-                  final textColor = mine ? scheme.onPrimaryContainer : scheme.onSurface;
+                  final align = mine
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start;
+                  final bubbleColor = mine
+                      ? scheme.primaryContainer
+                      : scheme.surfaceContainerHighest;
+                  final textColor = mine
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurface;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -128,7 +135,9 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                       crossAxisAlignment: align,
                       children: [
                         Row(
-                          mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                          mainAxisAlignment: mine
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
                           children: [
                             if (!mine)
                               Padding(
@@ -136,30 +145,45 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                                 child: CircleAvatar(
                                   radius: 14,
                                   backgroundColor: scheme.surfaceContainerHigh,
-                                  child: const FaIcon(FontAwesomeIcons.user, size: 12),
+                                  child: const FaIcon(
+                                    FontAwesomeIcons.user,
+                                    size: 12,
+                                  ),
                                 ),
                               ),
                             Flexible(
                               child: GestureDetector(
                                 onLongPress: () => _maybeOpenDm(m.senderUser),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: bubbleColor,
                                     borderRadius: BorderRadius.only(
                                       topLeft: const Radius.circular(14),
                                       topRight: const Radius.circular(14),
-                                      bottomLeft: Radius.circular(mine ? 14 : 4),
-                                      bottomRight: Radius.circular(mine ? 4 : 14),
+                                      bottomLeft: Radius.circular(
+                                        mine ? 14 : 4,
+                                      ),
+                                      bottomRight: Radius.circular(
+                                        mine ? 4 : 14,
+                                      ),
                                     ),
-                                    border: Border.all(color: scheme.outlineVariant),
+                                    border: Border.all(
+                                      color: scheme.outlineVariant,
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       if (!mine)
                                         Padding(
-                                          padding: const EdgeInsets.only(bottom: 4),
+                                          padding: const EdgeInsets.only(
+                                            bottom: 4,
+                                          ),
                                           child: Text(
                                             '@${m.senderUser}',
                                             style: TextStyle(
@@ -169,7 +193,10 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                                             ),
                                           ),
                                         ),
-                                      Text(m.text, style: TextStyle(color: textColor)),
+                                      Text(
+                                        m.text,
+                                        style: TextStyle(color: textColor),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -181,7 +208,10 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                                 child: CircleAvatar(
                                   radius: 14,
                                   backgroundColor: scheme.surfaceContainerHigh,
-                                  child: const FaIcon(FontAwesomeIcons.userAstronaut, size: 12),
+                                  child: const FaIcon(
+                                    FontAwesomeIcons.userAstronaut,
+                                    size: 12,
+                                  ),
                                 ),
                               ),
                           ],
@@ -189,7 +219,10 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                         const SizedBox(height: 4),
                         Text(
                           _fmtTime(m.ts),
-                          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -200,7 +233,6 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
           ),
         ),
 
-        // Composer
         SafeArea(
           top: false,
           child: Container(
@@ -219,7 +251,9 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
                     textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
                       hintText: 'Message the community…',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onSubmitted: (_) => _send(),
                   ),
@@ -243,7 +277,10 @@ class _GeneralChatPageState extends State<GeneralChatPage> {
     final mm = t.minute.toString().padLeft(2, '0');
     final ampm = t.hour >= 12 ? 'PM' : 'AM';
     final today = DateTime.now();
-    final isToday = t.year == today.year && t.month == today.month && t.day == today.day;
-    return isToday ? '$hh:$mm $ampm' : '${t.month}/${t.day}/${t.year.toString().substring(2)}';
+    final isToday =
+        t.year == today.year && t.month == today.month && t.day == today.day;
+    return isToday
+        ? '$hh:$mm $ampm'
+        : '${t.month}/${t.day}/${t.year.toString().substring(2)}';
   }
 }
