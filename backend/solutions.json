@@ -1,0 +1,10 @@
+{
+    "disease": "Potato Late Blight",
+    "cause": "Fungal-like oomycete pathogen Phytophthora infestans",
+    "symptoms": "Dark, water-soaked lesions on leaves, stems, and tubers; white fuzzy growth on leaf undersides; rapid plant collapse",
+    "treatment": [
+        "Apply fungicides preventatively and at first signs of infection",
+        "Remove and destroy infected plant material",
+        "Plant resistant potato varieties and practice crop rotation"
+    ]
+}
