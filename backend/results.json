@@ -1,10 +1,10 @@
 {
-  "timestamp": "2025-10-18T13:47:34.135165",
-  "filename": "scaled_9ddf5c97-5a08-48a3-8571-b42f2c8750536600723584528728858.jpg",
+  "timestamp": "2025-10-18T17:05:18.184041",
+  "filename": "scaled_d233e578-b8ac-4d9a-bc8d-5389535206e05737555442062597210.jpg",
   "labels": [
     {
-      "name": "Strawberry___Leaf_scorch",
-      "confidence": 99.99
+      "name": "Potato___Late_blight",
+      "confidence": 99.87
     }
   ]
 }

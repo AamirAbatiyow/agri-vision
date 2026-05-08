@@ -1,10 +1,10 @@
 {
-    "disease": "Strawberry Leaf Scorch",
-    "cause": "Fungal infection caused by Diplocarpon earliana",
-    "symptoms": "Purple to red spots on leaves, leaf margins turning brown and dry, eventual leaf death",
+    "disease": "Potato Late Blight",
+    "cause": "Oomycete pathogen Phytophthora infestans",
+    "symptoms": "Dark water-soaked spots on leaves, white fuzzy growth on leaf undersides, brown lesions on stems and tubers",
     "treatment": [
+        "Apply fungicides preventatively (e.g., chlorothalonil or mancozeb)",
         "Remove and destroy infected plant material",
-        "Apply fungicides preventatively or at first signs of infection",
-        "Improve air circulation by proper plant spacing and weed control"
+        "Plant resistant potato varieties"
     ]
 }
